@@ -1,4 +1,4 @@
-nProjects:= 5
+nProjects:= 10
 nCapProjects := 3
 nOldProjects := 2
 nNewProjects := 3
