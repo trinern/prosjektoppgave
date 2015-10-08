@@ -1,0 +1,187 @@
+model ProjModel
+uses "mmxprs"; 
+
+options explterm
+options noimplicit
+
+parameters
+	DataFile = 'Datafile.txt';
+	original = true; !Skal vi ha med dette?
+	SOSimplementation = false;	
+	Presolve = true;
+	Heuristic = true;
+	Cutting = 'Yes';
+	Print = 'True';
+end-parameters
+
+!Declarations of sets
+declarations
+	nProjects:		integer;
+	nCapProjects:	integer;	
+	nOldProjects:	integer;
+	nNewProjects:	integer;
+	nPeriods:		integer;
+	nScenarios:		integer;
+end-declarations
+	
+initializations from DataFile
+	nProjects;
+	nCapProjects;
+	nOldProjects;
+	nNewProjects;
+	nPeriods;
+	nScenarios;
+end-initializations
+	
+declarations
+	Projects:		set of integer;	!all identified existing and undeveloped power production projects
+	CapProjects:	set of integer;	!power production projects with reliable capacity 
+	OldProjects:	set of integer;	!existing power production facilities
+	NewProjects	:	set of integer;	!possible investments in power production projects
+	Periods:		set of integer;	!Periods in planning horizon
+	Scenarios:		set of integer;	!uncertainty
+end-declarations	
+	
+Projects 	:= 1 .. nProjects;			!i
+OldProjects := 1 .. nOldProjects;		!i,j
+NewProjects := nOldProjects .. nProjects;		!i,j
+Periods		:= 1 .. nPeriods;			!t
+Scenarios 	:= 1 .. nScenarios;			!s
+
+finalize(Projects);
+finalize(OldProjects);
+finalize(NewProjects);
+finalize(Periods);
+finalize(Scenarios);
+
+initializations from DataFile
+	CapProjects;	!how to do this?
+end-initializations
+
+!Declarations of parameters in matrix form	
+declarations
+	InvCost:		array(Projects)						of integer;
+	OprCost:		array(Projects)							of integer;
+	Capacity:		array(Projects)						of integer;
+	Prob:			array (Scenarios)						of real;
+	Demand:			array(Periods, Scenarios)				of real;
+	OprHours:		array (Projects, Periods, Scenarios)	of integer;
+end-declarations
+	
+initializations from DataFile
+	InvCost;
+	OprCost;
+	Capacity;
+	Prob;
+	Demand;
+	OprHours;
+end-initializations
+
+!test
+forall (ii in Projects, tt in Periods, ss in Scenarios)do
+	writeln("OprHours(" ii "," tt "," ss ")= " OprHours(ii,tt,ss));
+end-do
+	
+!Constants
+declarations
+	Penalty:		integer;
+	SpotPrice:		integer;
+	CapPrice:		integer;
+	Assets:			integer;
+end-declarations
+	
+initializations from DataFile
+	Penalty;
+	SpotPrice;
+	CapPrice;
+	Assets;
+end-initializations
+
+!Variables
+declarations
+	!variable holding amount of energy [MWh] produced from plant i in period t and scenario s
+	production: dynamic array(Projects, Periods, Scenarios) of mpvar;
+	!variable controlling weather a project is chosen or not
+	chooseProject: dynamic array(Projects) of mpvar;
+	!variable holding the producer's capacity auctioned in Cap Market [MW]
+	powerAuctioned: mpvar;
+	!variable holding the amount of energy not met in capacity market [MWh]
+	energyNotMet: dynamic array (Periods, Scenarios) of mpvar;
+end-declarations
+
+forall (ii in Projects, tt in Periods, ss in Scenarios) do
+	create(production(ii, tt, ss));
+end-do
+
+forall (ii in Projects) do	
+	create(chooseProject(ii));
+	chooseProject(ii) is_binary;
+end-do
+
+forall (ii in OldProjects) do
+	chooseProject(ii)=1;
+end-do
+
+forall (tt in Periods, ss in Scenarios) do
+	create (energyNotMet(tt,ss));
+	energyNotMet(tt,ss) is_free;
+end-do
+
+!powerAuctioned is_integer;
+
+!Constraints
+declarations
+	NetPresentValue:	linctr;!obj value, Present values not included 8/10
+	AssetCon:			linctr;!available assets
+	PowerAuctionedCon:	linctr;!available reliable capacity in exsiting and new plants
+	ProductionCon:		dynamic array (Projects, Periods, Scenarios) of linctr;!available energy production
+	DemandCon: 			dynamic array (Periods, Scenarios) of linctr;!Production and production not met equals expected demand
+	!calculating demand not met to pay a penalty for
+end-declarations
+
+NetPresentValue :=
+		sum (ii in Projects, tt in Periods, ss in Scenarios)SpotPrice*production(ii,tt,ss)
+		+
+		CapPrice*powerAuctioned
+		-
+		sum (ii in Projects, tt in Periods, ss in Scenarios) OprCost(ii)*production(ii, tt, ss)
+		-
+		sum (ii in NewProjects) InvCost(ii)*chooseProject(ii)
+		-
+		sum(tt in Periods) Penalty*energyNotMet(tt,nScenarios); !only one scenario for system stress assumed
+
+AssetCon :=
+sum(ii in NewProjects)InvCost(ii)*chooseProject(ii) <= Assets;
+
+PowerAuctionedCon:=
+	powerAuctioned <= 
+	sum(ii in (CapProjects))Capacity(ii)*chooseProject(ii); !reliable power capasity in exsiting plants and plants chosen for development (chooseProject=1 for existing)
+
+forall(ii in Projects, tt in Periods, ss in Scenarios) do
+	ProductionCon(ii, tt, ss):=
+	production(ii,tt,ss) <= OprHours(ii,tt,ss)*Capacity(ii)*chooseProject(ii);
+end-do
+
+!total energyprod. must be (larger or) equal to producer's total demand
+forall(tt in Periods, ss in Scenarios) do
+	DemandCon (tt,ss):=
+	sum(ii in Projects) production(ii,tt,ss)+ energyNotMet(tt,ss) = Demand(tt,ss)*sum(ii in Projects) Capacity(ii)*chooseProject(ii);
+end-do
+
+		
+maximize(NetPresentValue);
+
+(!writeln("Turbines");
+forall (tt in Turbines, ii in LocationTurbine | getsol(BuildTurbine(tt,ii)) > 0.01) do
+	writeln('size ',tt, ' location ',ii);!strfmt(getsol(BuildTurbine(tt,ii)),4), 'are built');
+end-do
+
+writeln('Cables');
+forall(ii in LocationTrans, jj in LocationTrans | getsol(Cable(ii,jj)) > 0.01) do
+	writeln('(', ii, ', ', jj, ')');
+end-do
+
+writeln('Optimal objection value : ',getobjval);
+
+!)
+end-model
