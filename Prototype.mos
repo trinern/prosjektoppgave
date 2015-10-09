@@ -1,8 +1,7 @@
 model ProjModel
 uses "mmxprs"; 
 
-options explterm
-options noimplicit
+options explterm, noimplicit;
 
 parameters
 	DataFile = 'Datafile.txt';
@@ -16,8 +15,7 @@ end-parameters
 
 !Declarations of sets
 declarations
-	nProjects:		integer;
-	nCapProjects:	integer;	
+	nProjects:		integer;	
 	nOldProjects:	integer;
 	nNewProjects:	integer;
 	nPeriods:		integer;
@@ -26,7 +24,6 @@ end-declarations
 	
 initializations from DataFile
 	nProjects;
-	nCapProjects;
 	nOldProjects;
 	nNewProjects;
 	nPeriods;
@@ -41,31 +38,33 @@ declarations
 	Periods:		set of integer;	!Periods in planning horizon
 	Scenarios:		set of integer;	!uncertainty
 end-declarations	
-	
+
+initializations from DataFile
+	CapProjects;
+end-initializations
+
 Projects 	:= 1 .. nProjects;			!i
-OldProjects := 1 .. nOldProjects;		!i,j
-NewProjects := nOldProjects .. nProjects;		!i,j
+OldProjects := 1 .. nOldProjects;		!i
+NewProjects := nOldProjects .. nProjects;		!i
 Periods		:= 1 .. nPeriods;			!t
 Scenarios 	:= 1 .. nScenarios;			!s
 
 finalize(Projects);
+finalize(CapProjects);
 finalize(OldProjects);
 finalize(NewProjects);
 finalize(Periods);
 finalize(Scenarios);
 
-initializations from DataFile
-	CapProjects;	!how to do this?
-end-initializations
-
 !Declarations of parameters in matrix form	
 declarations
-	InvCost:		array(Projects)						of integer;
-	OprCost:		array(Projects)							of integer;
-	Capacity:		array(Projects)						of integer;
-	Prob:			array (Scenarios)						of real;
-	Demand:			array(Periods, Scenarios)				of real;
-	OprHours:		array (Projects, Periods, Scenarios)	of integer;
+	InvCost:		array(Projects)				of integer;
+	OprCost:		array(Projects)				of integer;
+	Capacity:		array(Projects)				of integer;
+	Prob:			array (Scenarios)			of real;
+	ProdFactor:		array(Projects, Scenarios)	of real;
+	Demand:			array(Periods, Scenarios)	of real;
+	OprHours:		array (Projects, Periods)	of integer;
 end-declarations
 	
 initializations from DataFile
@@ -73,15 +72,11 @@ initializations from DataFile
 	OprCost;
 	Capacity;
 	Prob;
+	ProdFactor;
 	Demand;
 	OprHours;
 end-initializations
 
-!test
-forall (ii in Projects, tt in Periods, ss in Scenarios)do
-	writeln("OprHours(" ii "," tt "," ss ")= " OprHours(ii,tt,ss));
-end-do
-	
 !Constants
 declarations
 	Penalty:		integer;
@@ -159,7 +154,7 @@ PowerAuctionedCon:=
 
 forall(ii in Projects, tt in Periods, ss in Scenarios) do
 	ProductionCon(ii, tt, ss):=
-	production(ii,tt,ss) <= OprHours(ii,tt,ss)*Capacity(ii)*chooseProject(ii);
+	production(ii,tt,ss) <= ProdFactor(ii,ss)*OprHours(ii,tt)*Capacity(ii)*chooseProject(ii);
 end-do
 
 !total energyprod. must be (larger or) equal to producer's total demand
