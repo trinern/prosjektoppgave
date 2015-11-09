@@ -155,7 +155,7 @@ declarations
 	chosenPlant: 			dynamic array (Plants) of mpvar;	!binary var = 1 if plant i is chosen for investment
 	dayAheadParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if day-ahead market participation in year t
 	balanceParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if balance market participation in year t
-	soldCap: 				dynamic array (Years, Plants) of mpvar;	!cap sold in cap market from plant i in year t
+	soldCap: 				dynamic array (Years, CapPlants) of mpvar;	!cap sold in cap market from plant i in year t
 	!2nd stage
 	soldDayAhead: dynamic array(Years, Hours, Scenarios) of mpvar;	!energy sold in day-ahead market for year t, hour h and 2nd stage scenario s
 	!3rd stage
@@ -181,7 +181,7 @@ forall (tt in Years) do
 	balanceParticipation(tt) is_binary;
 end-do
 
-forall (tt in Years, ii in Plants) do
+forall (tt in Years, ii in CapPlants) do
 	create (soldCap(tt, ii));
 end-do
 
@@ -219,7 +219,7 @@ declarations
 	!HydroConH1:			dynamic array (Years, HydroPlants, Scenarios, Errors, Periods) of linctr;!hydropower constraint first hour
 	InvestmentCon:		dynamic array (Plants) of linctr;
 	ProdSalesBalance:	dynamic array (Years, Hours, Scenarios, Errors) of linctr;	!balancing production, sales, purchases, pumping
-	StressBalance:		dynamic array (Years, Hours, Plants, Scenarios, Errors) of linctr;!balancing production, sales and unmet cap liabilities during system stress
+	StressBalance:		dynamic array (Years, Hours, CapPlants, Scenarios, Errors) of linctr;!balancing production, sales and unmet cap liabilities during system stress
 	!StartUpCon:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr; ! controlling binary start-up var
 	LowLimThermal:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr; ! lower limit production thermal plants
 	BalMarketPart1:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against purchase variable
@@ -233,7 +233,7 @@ NetPresentValue :=
 		-
 		sum (tt in Years) DiscFactor(tt)*(DayAheadFee*dayAheadParticipation(tt) + BalanceFee*balanceParticipation(tt))
 		+
-		sum (tt in Years, ii in Plants) DiscFactor(tt)*CapPrice*soldCap(tt, ii)
+		sum (tt in Years, ii in CapPlants) DiscFactor(tt)*CapPrice*soldCap(tt, ii)
 		+ 
 		ScaleFactor * sum (tt in Years)DiscFactor(tt)*
 			(
@@ -282,12 +282,12 @@ end-do
 
 forall (tt in Years, hh in Hours | (hh not in Hours0), ii in ThermalPlants, ss in Scenarios, ww in Errors) do
 	StartingCon(tt,hh,ii,ss,ww):=
-		isRunning(tt,(hh-1),ii,ss,ww) + startedAt(tt,hh,ii,ss,ww) - isRunning(tt,hh,ii,ss,ww) >= 0;
+		isRunning(tt,(hh-1),ii,ss,ww) + startedAt(tt,hh,ii,ss,ww) - isRunning(tt,hh,ii,ss,ww) = 0;
 end-do
 
 forall (tt in Years, hh in Hours0, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
 	StartingCon(tt,hh,ii,ss,ww):=
-		startedAt(tt,hh,ii,ss,ww) >= 0;
+		startedAt(tt,hh,ii,ss,ww) - isRunning(tt,hh,ii,ss,ww) = 0;
 end-do
 
 forall(tt in Years, hh in Hours | hh not in Hours0, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
@@ -325,10 +325,17 @@ forall(tt in Years, hh in Hours, ss in Scenarios, ww in Errors) do
 end-do
 			
 				
-forall (tt in Years, hh in Hours, ii in Plants, ss in Scenarios | (Demand(hh)-EstimatedProd(ss,hh)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
+forall (tt in Years, hh in Hours, ii in CapPlants, ss in Scenarios | (Demand(hh)-EstimatedProd(ss,hh)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
 	StressBalance(tt,hh,ii,ss,ww):=
-		production(tt,hh,ii,ss,ww) + unmetCap(tt,hh,ii,ss,ww) - soldCap(tt,ii) = 0;
+		production(tt,hh,ii,ss,ww) + unmetCap(tt,hh,ii,ss,ww) - soldCap(tt,ii) = 0; ! if sold cap from i must be met by production on plant i
 end-do
+
+(!
+forall (tt in Years, hh in Hours, ss in Scenarios | (Demand(hh)-EstimatedProd(ss,hh)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
+	StressBalance(tt,hh,ss,ww):=
+		sum (ii in Plants) production(tt,hh,ii,ss,ww) + unmetCap(tt,hh,ss,ww) - sum(jj in CapPlants)soldCap(tt,jj) = 0;	!if sold cap from plant i can be met by production on any plant
+end-do
+!)
 
 forall(tt in Years, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
 	LowLimThermal(tt,hh,ii,ss,ww):=
