@@ -1,11 +1,11 @@
 nYears:		2
-nHours:		1344
+nHours:		3
 nPlants: 	3
 nScenarios:	2
 nErrors:	2
 nPeriods:	1
 
-Hours0:		[1	337	673	1009]
+Hours0:		[1]
 CapPlants:	[2 3]
 WindPlants:	[1]
 ThermalPlants:	[2]

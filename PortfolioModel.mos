@@ -4,7 +4,8 @@ uses "mmxprs";
 options explterm, noimplicit;
 
 parameters
-	DataFile = 'PortfolioData.txt';
+	DataFile = 'PortfolioDataTest.txt'; !Test files when running on student license
+	LoadFile = 'LoadDataTest.txt';!Test files when running on student license
 	original = true;
 	SOSimplementation = false;	
 	Presolve = true;
@@ -12,6 +13,13 @@ parameters
 	Cutting = 'Yes';
 	Print = 'True';
 end-parameters
+
+declarations
+  timetracker:	real; ! used to log timestamps for time consumption output
+end-declarations
+
+writeln("Building model...");
+timetracker := timestamp; ! assigns current "timestamp" to timetracker
 
 !Declarations of sets
 declarations
@@ -81,7 +89,7 @@ declarations
 	Prob3:			array(Scenarios, Errors)	of real;	!probability for error w given scenario s
 	BalSalesPrice:	array(Scenarios, Errors)	of	real;!consider including demand
 	BalPurchPrice:	array(Scenarios, Errors)	of	real;!consider including demand
-	ProdFactor:		array(Scenarios, Errors)	of real;
+	ForecastError:	array(Scenarios, Errors)	of real;
 	DayAheadPrice:	array(Scenarios, Hours)		of real;!Include demand?
 	EstimatedProd:	array(Scenarios, Hours)		of real;!wind power production in scenario s, hour h
 	OprHours:		array(Plants)				of real;
@@ -90,7 +98,6 @@ end-declarations
 	
 initializations from DataFile
 	DiscFactor;
-	Demand;
 	InvCost;
 	InvCostFixed;
 	OprCost;
@@ -102,11 +109,15 @@ initializations from DataFile
 	Prob3;
 	BalSalesPrice;
 	BalPurchPrice;
-	ProdFactor;
+	ForecastError;
 	DayAheadPrice;
 	EstimatedProd;
 	OprHours;
 	ReservoirEnergy;
+end-initializations
+
+initializations from LoadFile
+	Demand;
 end-initializations
 
 !Constants
@@ -250,7 +261,7 @@ end-do
 
 forall(tt in Years, hh in Hours, ii in WindPlants, ss in Scenarios, ww in Errors) do
 	ProductionConWind(tt,hh,ii,ss,ww):=
-		production(tt,hh,ii,ss,ww) - ProdFactor(ss,ww)*OprHours(ii)*investedCap(ii) <= 0;	!Upper bound intermittent production, scenario dependent
+		production(tt,hh,ii,ss,ww) - EstimatedProd(ss,hh)*(1-ForecastError(ss,ww))*OprHours(ii)*investedCap(ii) = 0;	!Upper bound intermittent production, scenario dependent
 end-do
 
 forall(tt in Years, hh in Hours, ii in Plants | Plants <> WindPlants, ss in Scenarios, ww in Errors) do
@@ -342,20 +353,13 @@ forall(tt in Years) do
 		sum(ii in Plants) UpperCap(ii)*nHours*nScenarios 
 		<= 0;		
 end-do		
+
+writeln("\nModel building completed in ", timestamp - timetracker, " seconds");
+writeln("\nSolving model...");
+timetracker := timestamp;
 		
 maximize(NetPresentValue);
 
-(!writeln("Execution time: ", );
-forall (tt in Turbines, ii in LocationTurbine | getsol(BuildTurbine(tt,ii)) > 0.01) do
-	writeln('size ',tt, ' location ',ii);!strfmt(getsol(BuildTurbine(tt,ii)),4), 'are built');
-end-do
+writeln("\nModel solved in ", timestamp - timetracker," seconds");
 
-writeln('Cables');
-forall(ii in LocationTrans, jj in LocationTrans | getsol(Cable(ii,jj)) > 0.01) do
-	writeln('(', ii, ', ', jj, ')');
-end-do
-
-writeln('Optimal objection value : ',getobjval);
-
-!)
 end-model
