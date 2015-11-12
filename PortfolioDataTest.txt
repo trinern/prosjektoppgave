@@ -1,67 +1,35 @@
 nYears:		2
-nHours:		3
-nPlants: 	3
+nHours:		96
+nPlants: 	5
 nScenarios:	2
-nErrors:	2
-nPeriods:	1
+nErrors:	5
 
-Hours0:		[1]
-CapPlants:	[2 3]
-WindPlants:	[1]
-ThermalPlants:	[2]
-HydroPlants:	[3]
-Seasons:	[1 2 3]
+Hours0:		[1 49]
+CapPlants:	[1 2]
+WindPlants:	[3 4 5]
+ThermalPlants:	[1 2]
+HydroPlants:	[]
 
 DiscFactor:	[0.82 0.78]
-InvCost:	[10 10 10]
-InvCostFixed:	[50	50	50]
-OprCost:	[1	1	1]
-UpperCap:	[50 50 50]
-StartUpCost:	[1]
-UpperRamping:	[0.4]
-LowerThermal:	[0.05]
-Prob2:		[0.5	0.5]
-OprHours:	[1	1	1]
-ReservoirEnergy:[5]
+InvCost:	[718300 1789400 1520000 2840000 3625000]
+OprCost:	[49.2 22.1 0 0 0]
+FixedOprCost:	[15000 38000 13703 50243 97750]
+UpperCap:	[20000 30000 50000 50000 50000]
+StartUpCost:	[150 150]
+UpperRamping:	[0.7 1]
+LowerThermal:	[0.1 0.1]
+OprHours:	[0.912 0.902 0.979 0.959 0.946]
+ReservoirEnergy:[]
 
-
-Prob3:	[
-0.5	0.5
-0.5	0.5
-]
-
-BalSalesPrice:	[
-1.0	2.5
-1.0	2.5
-]
-
-BalPurchPrice:	[
-1.5	3.5
-1.5	3.5
-]
-
-ForecastError:	[
-0.8	0.4
-0.8	0.4
-]
-
-DayAheadPrice:	[
-0.7	1.2
-0.7	1.2
-]
-
-EstimatedProd:	[
-2	1
-2	1
-]
-
-CapPrice:		10
-Penalty:		20
-TransCostDayAhead:	0.01
-TransCostBalance:	0.02
+CapPrice:		19.40
+Penalty:		200
+IDPriceConst:		-5.40
+TransCostDayAhead:	1.5
+TransCostIntraDay:	4.75
 DayAheadFee:		10
-BalanceFee:		10
+IntraDayFee:		10
 PeriodsPerYear:		26
 LowerStressLimit:	0.5
 PumpEff:		0.9
 ScaleFactor:		44
+TotalWindCap:		12440

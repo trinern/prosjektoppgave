@@ -4,8 +4,12 @@ uses "mmxprs";
 options explterm, noimplicit;
 
 parameters
-	DataFile = 'PortfolioDataTest.txt'; !Test files when running on student license
-	LoadFile = 'LoadDataTest.txt';!Test files when running on student license
+	DataFile = 'PortfolioDataTest.txt'; !'PortfolioData.txt' or 'PortfolioDataTest.txt'
+	LoadFile = 'LoadDataTest.txt';!'LoadData.txt' or 'LoadDataTest.txt'
+	IDPriceFile = 'IntraDayPriceFileTest.txt';	!IntraDayPriceFactor
+	ForecastFile = 'ForecastDataTest.txt'; !'ForecastData.txt' or 'ForecastDataTest.txt' test: 48 h x 2
+	ErrorFile = 'ForecastErrorDataTest.txt';
+	DAPriceFile = 'DAPriceDataTest.txt';
 	original = true;
 	SOSimplementation = false;	
 	Presolve = true;
@@ -79,19 +83,20 @@ declarations
 	DiscFactor:		array(Years)				of real;	!factor corresponding to discount rate
 	Demand:			array(Hours)				of real;	!forcasted demand in hour h
 	InvCost:		array(Plants)				of integer;
-	InvCostFixed:	array(Plants)				of integer;
-	OprCost:		array(Plants)				of integer;
+	!InvCostFixed:	array(Plants)				of integer;
+	OprCost:		array(Plants)				of real;
+	FixedOprCost:	array(Plants)				of integer;	!yearly operating cost
 	UpperCap:		array(Plants)				of integer; !upper limit on cap installation
 	StartUpCost:	array(ThermalPlants)		of integer;
 	UpperRamping:	array(ThermalPlants)		of real;	!max ramping from h to h+1 thermal plants
 	LowerThermal:	array(ThermalPlants)		of real;	!lower running capacity for thermal plants
 	Prob2:			array(Scenarios)			of real;	!probability for scenario s
-	Prob3:			array(Scenarios, Errors)	of real;	!probability for error w given scenario s
-	BalSalesPrice:	array(Scenarios, Errors)	of	real;!consider including demand
-	BalPurchPrice:	array(Scenarios, Errors)	of	real;!consider including demand
-	ForecastError:	array(Scenarios, Errors)	of real;
-	DayAheadPrice:	array(Scenarios, Hours)		of real;!Include demand?
-	EstimatedProd:	array(Scenarios, Hours)		of real;!wind power production in scenario s, hour h
+	Prob3:			array(Hours, Errors)		of real;	!probability for error w in hour h
+	IDPriceFactor:	array(Hours)				of	real;	!load specific intra-day price
+	!BalPurchPrice:	array(Scenarios, Errors)	of	real;!consider including demand
+	ForecastError:	array(Hours, Errors)		of real;
+	DayAheadPrice:	array(Hours)				of real;
+	EstimatedProd:	array(Hours, Scenarios)		of real;!wind power production in scenario s, hour h
 	OprHours:		array(Plants)				of real;
 	ReservoirEnergy:array(Plants, Hours0)		of integer;	!energy in reservoir at beginning of period
 end-declarations
@@ -99,19 +104,14 @@ end-declarations
 initializations from DataFile
 	DiscFactor;
 	InvCost;
-	InvCostFixed;
+	!InvCostFixed;
 	OprCost;
+	FixedOprCost;
 	UpperCap;
 	StartUpCost;
 	UpperRamping;
 	LowerThermal;
-	Prob2;
-	Prob3;
-	BalSalesPrice;
-	BalPurchPrice;
-	ForecastError;
-	DayAheadPrice;
-	EstimatedProd;
+	!BalPurchPrice;
 	OprHours;
 	ReservoirEnergy;
 end-initializations
@@ -120,29 +120,51 @@ initializations from LoadFile
 	Demand;
 end-initializations
 
+initializations from IDPriceFile
+	IDPriceFactor;
+end-initializations
+
+initializations from ForecastFile
+	Prob2;
+	EstimatedProd;
+end-initializations
+
+initializations from ErrorFile
+	Prob3;
+	ForecastError;
+end-initializations
+
+initializations from DAPriceFile
+	DayAheadPrice;
+end-initializations
+
 !Constants
 declarations
-	CapPrice:			integer;
+	CapPrice:			real;
 	Penalty:			integer;
+	IDPriceConst:		real;	!wind power production const in price expression
 	TransCostDayAhead:	real;	!proportional transaction cost day-ahead market
-	TransCostBalance:	real;	!proportional transaction cost balance market, assumed equal for sales and purchases
+	TransCostIntraDay:	real;	!proportional transaction cost balance market, assumed equal for sales and purchases
 	DayAheadFee:		integer;!yearly participation fee day-ahead market
-	BalanceFee:			integer;!yearly participation fee balance market
+	IntraDayFee:		integer;!yearly participation fee balance market
 	LowerStressLimit:	real;	!definition for system stress at scenario s in hour h	
 	PumpEff:			real;!efficiency of pump storage
 	ScaleFactor:		integer;
+	TotalWindCap:		integer;	!total installed wind power capacity in market
 end-declarations
 	
 initializations from DataFile
 	CapPrice;
 	Penalty;
+	IDPriceConst;
 	TransCostDayAhead;
-	TransCostBalance;
+	TransCostIntraDay;
 	DayAheadFee;
-	BalanceFee;
+	IntraDayFee;
 	LowerStressLimit;
 	PumpEff;
 	ScaleFactor;
+	TotalWindCap;
 end-initializations
 
 !Variables
@@ -151,14 +173,14 @@ declarations
 	investedCap: 			dynamic array (Plants) of mpvar;	!cap invested in plant i
 	chosenPlant: 			dynamic array (Plants) of mpvar;	!binary var = 1 if plant i is chosen for investment
 	dayAheadParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if day-ahead market participation in year t
-	balanceParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if balance market participation in year t
+	intraDayParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if balance market participation in year t
 	soldCap: 				dynamic array (Years, CapPlants) of mpvar;	!cap sold in cap market from plant i in year t
 	!2nd stage
 	soldDayAhead: dynamic array(Years, Hours, Scenarios) of mpvar;	!energy sold in day-ahead market for year t, hour h and 2nd stage scenario s
 	!3rd stage
 	production: dynamic array (Years, Hours, Plants, Scenarios, Errors) of mpvar;	!energy produced from plant i
-	soldBalance: dynamic array (Years, Hours, Scenarios, Errors) of mpvar;	!energy sold in balance market
-	purchBalance: dynamic array (Years, Hours, Scenarios, Errors) of mpvar;	!energy purchased in balance market
+	soldIntraDay: dynamic array (Years, Hours, Scenarios, Errors) of mpvar;	!energy sold in intra-day market
+	purchIntraDay: dynamic array (Years, Hours, Scenarios, Errors) of mpvar;	!energy purchased in intra-day market
 	unmetCap: dynamic array (Years, Hours, Plants, Scenarios, Errors) of mpvar;	!energy not meeting capacity liabilities. Assuming system stress lasting 1 h
 	pumpStorage:	dynamic array (Years, Hours, HydroPlants, Scenarios, Errors) of mpvar;
 	isRunning:		dynamic array(Years, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
@@ -174,8 +196,8 @@ end-do
 forall (tt in Years) do
 	create (dayAheadParticipation(tt));
 	dayAheadParticipation(tt) is_binary;
-	create (balanceParticipation(tt));
-	balanceParticipation(tt) is_binary;
+	create (intraDayParticipation(tt));
+	intraDayParticipation(tt) is_binary;
 end-do
 
 forall (tt in Years, ii in CapPlants) do
@@ -191,8 +213,8 @@ forall (tt in Years, hh in Hours, ii in Plants, ss in Scenarios, ww in Errors) d
 end-do
 
 forall (tt in Years, hh in Hours, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (soldBalance(tt, hh, ss, ww));
-	create (purchBalance(tt, hh, ss, ww));
+	create (soldIntraDay(tt, hh, ss, ww));
+	create (purchIntraDay(tt, hh, ss, ww));
 end-do
 
 forall (tt in Years, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
@@ -200,6 +222,14 @@ forall (tt in Years, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Er
 	startedAt(tt,hh,ii,ss,ww) is_binary;
 	create (isRunning(tt, hh, ii, ss, ww));
 	isRunning(tt,hh,ii,ss,ww) is_binary;
+end-do
+
+forall (tt in Years, hh in Hours, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create (pumpStorage(tt, hh, ii, ss, ww));
+end-do
+
+forall (tt in Years, hh in Hours, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (unmetCap(tt, hh, ii, ss, ww));
 end-do
 
 !Constraints
@@ -216,16 +246,16 @@ declarations
 	ProdSalesBalance:	dynamic array (Years, Hours, Scenarios, Errors) of linctr;	!balancing production, sales, purchases, pumping
 	StressBalance:		dynamic array (Years, Hours, CapPlants, Scenarios, Errors) of linctr;!balancing production, sales and unmet cap liabilities during system stress
 	LowLimThermal:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr; ! lower limit production thermal plants
-	BalMarketPart1:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against purchase variable
-	BalMarketPart2:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against sale variable
+	IDMarketPart1:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against purchase variable
+	IDMarketPart2:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against sale variable
 	DayAheadMarketPart:	dynamic array (Years) of linctr;	!controlling variable for Day-ahead market participation
 end-declarations
 
 NetPresentValue :=
 		-
-		sum (ii in Plants) (InvCost(ii)*investedCap(ii) + InvCostFixed(ii)*chosenPlant(ii))
+		sum (ii in Plants) (InvCost(ii)*investedCap(ii))! + InvCostFixed(ii)*chosenPlant(ii))
 		-
-		sum (tt in Years) DiscFactor(tt)*(DayAheadFee*dayAheadParticipation(tt) + BalanceFee*balanceParticipation(tt))
+		sum (tt in Years,ii in Plants) DiscFactor(tt)*(DayAheadFee*dayAheadParticipation(tt) + IntraDayFee*intraDayParticipation(tt)+FixedOprCost(ii)*chosenPlant(ii))
 		+
 		sum (tt in Years, ii in CapPlants) DiscFactor(tt)*CapPrice*soldCap(tt, ii)
 		+ 
@@ -233,22 +263,34 @@ NetPresentValue :=
 			(
 				sum (ss in Scenarios) Prob2(ss) *
 					(
-						sum (hh in Hours) (DayAheadPrice(ss, hh)-TransCostDayAhead)*soldDayAhead(tt,hh,ss)
+						sum (hh in Hours) (DayAheadPrice(hh)-TransCostDayAhead)*soldDayAhead(tt,hh,ss)
 						+
-						sum(ww in Errors) Prob3(ss,ww)*
+						sum(hh in Hours, ww in Errors) Prob3(hh,ww)*
 							(
-								sum (hh in Hours, ii in Plants)
+								(
 									(
-										(BalSalesPrice(ss,ww)-TransCostBalance) * soldBalance(tt,hh,ss,ww)
-										-
-										(BalPurchPrice(ss,ww)+TransCostBalance) * purchBalance(tt,hh,ss,ww)
+										IDPriceFactor(hh)+ IDPriceConst*EstimatedProd(hh,ss)*(1-ForecastError(hh,ww))*TotalWindCap!IDPrice
+									)
+									-
+									TransCostIntraDay
+								)* soldIntraDay(tt,hh,ss,ww)
+								-
+								(
+								IDPriceFactor(hh)+ IDPriceConst*EstimatedProd(hh,ss)*(1-ForecastError(hh,ww))*TotalWindCap!IDPrice
+								+
+								TransCostIntraDay
+								)* purchIntraDay(tt,hh,ss,ww)
+							
+								+
+								sum (ii in Plants)
+									(
 										-
 										OprCost(ii)*production(tt,hh,ii,ss,ww)
 										-
 										Penalty*unmetCap(tt,hh,ii,ss,ww)
 									)	
-								-
-								sum(hh in Hours, ii in ThermalPlants) StartUpCost(ii)*startedAt(tt,hh,ii,ss,ww)
+									-
+								sum( ii in ThermalPlants) StartUpCost(ii)*startedAt(tt,hh,ii,ss,ww)
 		
 							)
 					)
@@ -261,7 +303,7 @@ end-do
 
 forall(tt in Years, hh in Hours, ii in WindPlants, ss in Scenarios, ww in Errors) do
 	ProductionConWind(tt,hh,ii,ss,ww):=
-		production(tt,hh,ii,ss,ww) - EstimatedProd(ss,hh)*(1-ForecastError(ss,ww))*OprHours(ii)*investedCap(ii) = 0;	!Upper bound intermittent production, scenario dependent
+		production(tt,hh,ii,ss,ww) - EstimatedProd(hh,ss)*(1-ForecastError(hh,ww))*OprHours(ii)*investedCap(ii) = 0;	!Upper bound intermittent production, scenario dependent
 end-do
 
 forall(tt in Years, hh in Hours, ii in Plants | Plants <> WindPlants, ss in Scenarios, ww in Errors) do
@@ -311,15 +353,14 @@ end-do
 
 forall(tt in Years, hh in Hours, ss in Scenarios, ww in Errors) do
 	ProdSalesBalance(tt,hh,ss,ww):=												!Balance for energy produced, stored, sold and purchased
-		+ purchBalance(tt,hh,ss,ww)- soldBalance(tt,hh,ss,ww)
+		+ purchIntraDay(tt,hh,ss,ww)- soldIntraDay(tt,hh,ss,ww)
 		- soldDayAhead(tt,hh,ss)
 		- sum(ii in HydroPlants) pumpStorage(tt,hh,ii,ss,ww)
 		+ sum(ii in Plants)production(tt,hh,ii,ss,ww)
 		= 0;	
-end-do
-			
+end-do		
 				
-forall (tt in Years, hh in Hours, ii in CapPlants, ss in Scenarios | (Demand(hh)-EstimatedProd(ss,hh)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
+forall (tt in Years, hh in Hours, ii in CapPlants, ss in Scenarios | (Demand(hh)-TotalWindCap*EstimatedProd(hh,ss)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
 	StressBalance(tt,hh,ii,ss,ww):=
 		production(tt,hh,ii,ss,ww) + unmetCap(tt,hh,ii,ss,ww) - soldCap(tt,ii) = 0; ! if sold cap from i must be met by production on plant i
 end-do
@@ -337,13 +378,13 @@ forall(tt in Years, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Err
 end-do
 
 forall(tt in Years) do
-	BalMarketPart1(tt):=	!controlling the variable for participation in Bal market to be 1 if any purchase variable is > 0
-		sum(hh in Hours, ss in Scenarios, ww in Errors) purchBalance(tt,hh,ss,ww) 
+	IDMarketPart1(tt):=	!controlling the variable for participation in Bal market to be 1 if any purchase variable is > 0
+		sum(hh in Hours, ss in Scenarios, ww in Errors) purchIntraDay(tt,hh,ss,ww) 
 		- 
 		sum(ii in Plants) UpperCap(ii)*nHours*nScenarios*nErrors 
 		<= 0;	
-	BalMarketPart2(tt):=	!controlling the variable for participation in Bal market to be 1 if any sale variable is > 0
-		sum(hh in Hours, ss in Scenarios, ww in Errors) soldBalance(tt,hh,ss,ww) 
+	IDMarketPart2(tt):=	!controlling the variable for participation in Bal market to be 1 if any sale variable is > 0
+		sum(hh in Hours, ss in Scenarios, ww in Errors) soldIntraDay(tt,hh,ss,ww) 
 		- 
 		sum(ii in Plants) UpperCap(ii)*nHours*nScenarios*nErrors 
 		<= 0;
