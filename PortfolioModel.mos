@@ -44,11 +44,13 @@ end-initializations
 	
 declarations
 	Years:			set of integer;	!Years in planning horizon
+	Days:			set of integer;	!Days where decitions are made (3)
+	DaysFC:			set of integer; !Days where a 24-forecast is given (4)
 	Hours:			set of integer; !hours in each year in horizon
 	Hours0:			set of integer;	!all first hours in each period
 	Plants:			set of integer;	!all identified power production plants
-	Scenarios:		set of integer;	!2nd stage uncertainty
-	Errors:			set of integer;	!3rd stage uncertainty
+	Scenarios:		set of integer;	!first level uncertainty, given as paths until leaf nodes
+	Errors:			set of integer;	!2nd level uncertainty
 	CapPlants:		set of integer;	!power production projects with reliable capacity 
 	WindPlants:		set of integer;	!wind plants
 	ThermalPlants:	set of integer;	!set of thermal plants
@@ -56,6 +58,8 @@ declarations
 end-declarations	
 
 initializations from DataFile
+	Days;
+	DaysFC;
 	Hours0;
 	CapPlants;
 	WindPlants;
@@ -90,8 +94,8 @@ declarations
 	StartUpCost:	array(ThermalPlants)		of integer;
 	UpperRamping:	array(ThermalPlants)		of real;	!max ramping from h to h+1 thermal plants
 	LowerThermal:	array(ThermalPlants)		of real;	!lower running capacity for thermal plants
-	Prob2:			array(Scenarios)			of real;	!probability for scenario s
-	Prob3:			array(Hours, Errors)		of real;	!probability for error w in hour h
+	ProbS:			array(Scenarios)			of real;	!probability for scenario s
+	ProbSE:			array(Scenarios, Errors)	of real;	!probability for error w in hour h
 	IDPriceFactor:	array(Hours)				of	real;	!load specific intra-day price
 	!BalPurchPrice:	array(Scenarios, Errors)	of	real;!consider including demand
 	ForecastError:	array(Hours, Errors)		of real;
@@ -125,12 +129,12 @@ initializations from IDPriceFile
 end-initializations
 
 initializations from ForecastFile
-	Prob2;
+	ProbS;
 	EstimatedProd;
 end-initializations
 
 initializations from ErrorFile
-	Prob3;
+	ProbSE;
 	ForecastError;
 end-initializations
 
@@ -169,80 +173,87 @@ end-initializations
 
 !Variables
 declarations	
-	!1st stage
-	investedCap: 			dynamic array (Plants) of mpvar;	!cap invested in plant i
-	chosenPlant: 			dynamic array (Plants) of mpvar;	!binary var = 1 if plant i is chosen for investment
-	dayAheadParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if day-ahead market participation in year t
-	intraDayParticipation: 	dynamic array (Years) of mpvar;!binary var = 1 if balance market participation in year t
-	soldCap: 				dynamic array (Years, CapPlants) of mpvar;	!cap sold in cap market from plant i in year t
-	!2nd stage
-	soldDayAhead: dynamic array(Years, Hours, Scenarios) of mpvar;	!energy sold in day-ahead market for year t, hour h and 2nd stage scenario s
-	!3rd stage
-	production: dynamic array (Years, Hours, Plants, Scenarios, Errors) of mpvar;	!energy produced from plant i
-	soldIntraDay: dynamic array (Years, Hours, Scenarios, Errors) of mpvar;	!energy sold in intra-day market
-	purchIntraDay: dynamic array (Years, Hours, Scenarios, Errors) of mpvar;	!energy purchased in intra-day market
-	unmetCap: dynamic array (Years, Hours, Plants, Scenarios, Errors) of mpvar;	!energy not meeting capacity liabilities. Assuming system stress lasting 1 h
-	pumpStorage:	dynamic array (Years, Hours, HydroPlants, Scenarios, Errors) of mpvar;
-	isRunning:		dynamic array(Years, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
-	startedAt:		dynamic array(Years, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
+
+	investedCap: 			dynamic array (Plants, Scenarios) of mpvar;	!cap invested in plant i
+	chosenPlant: 			dynamic array (Plants, Scenarios) of mpvar;	!binary var = 1 if plant i is chosen for investment
+	!dayAheadParticipation: 	dynamic array (Years, Scenarios) of mpvar;!binary var = 1 if day-ahead market participation in year t
+	!intraDayParticipation: 	dynamic array (Years, Scenarios) of mpvar;!binary var = 1 if balance market participation in year t
+	soldCap: 				dynamic array (Years, CapPlants, Scenarios) of mpvar;	!cap sold in cap market from plant i in year t
+
+	soldDayAhead: dynamic array(Years, Days, Hours, Scenarios) of mpvar;	!energy sold in day-ahead market for year t, hour h and 2nd stage scenario s
+
+	production: dynamic array (Years, Days, Hours, Plants, Scenarios, Errors) of mpvar;	!energy produced from plant i
+	soldIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy sold in intra-day market
+	purchIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy purchased in intra-day market
+	unmetCap: dynamic array (Years, Days, Hours, Plants, Scenarios, Errors) of mpvar;	!energy not meeting capacity liabilities. Assuming system stress lasting 1 h
+	pumpStorage:	dynamic array (Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
+	isRunning:		dynamic array(Years, Days, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
+	startedAt:		dynamic array(Years, Days, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
+	stored:			dynamic array(Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
+	spilled:		dynamic array(Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;		
 end-declarations
 
-forall (ii in Plants) do
-	create (investedCap(ii));
-	create (chosenPlant(ii));
+forall (ii in Plants, ss in Scenarios) do
+	create (investedCap(ii,ss));
+	create (chosenPlant(ii,ss));
 	chosenPlant(ii) is_binary;
 end-do
 
-forall (tt in Years) do
+(!forall (tt in Years) do
 	create (dayAheadParticipation(tt));
 	dayAheadParticipation(tt) is_binary;
 	create (intraDayParticipation(tt));
 	intraDayParticipation(tt) is_binary;
+end-do!)
+
+forall (tt in Years, ii in CapPlants, ss in Scenarios) do
+	create (soldCap(tt, ii,ss));
 end-do
 
-forall (tt in Years, ii in CapPlants) do
-	create (soldCap(tt, ii));
+forall (tt in Years, dd in Days, hh in Hours, ss in Scenarios) do !consider preprocessing
+	create (soldDayAhead(tt,dd ,hh, ss));
 end-do
 
-forall (tt in Years, hh in Hours, ss in Scenarios) do !consider preprocessing
-	create (soldDayAhead(tt ,hh, ss));
+forall (tt in Years, dd in Days, hh in Hours, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (production(tt,dd, hh, ii, ss, ww));
 end-do
 
-forall (tt in Years, hh in Hours, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (production(tt, hh, ii, ss, ww));
+forall (tt in Years, dd in Days, hh in Hours, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (soldIntraDay(tt,dd, hh, ss, ww));
+	create (purchIntraDay(tt,dd, hh, ss, ww));
 end-do
 
-forall (tt in Years, hh in Hours, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (soldIntraDay(tt, hh, ss, ww));
-	create (purchIntraDay(tt, hh, ss, ww));
+forall (tt in Years, dd in Days, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
+	create (startedAt(tt,dd, hh, ii, ss, ww));
+	startedAt(tt,dd,hh,ii,ss,ww) is_binary;
+	create (isRunning(tt,dd, hh, ii, ss, ww));
+	isRunning(tt,dd,hh,ii,ss,ww) is_binary;
 end-do
 
-forall (tt in Years, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
-	create (startedAt(tt, hh, ii, ss, ww));
-	startedAt(tt,hh,ii,ss,ww) is_binary;
-	create (isRunning(tt, hh, ii, ss, ww));
-	isRunning(tt,hh,ii,ss,ww) is_binary;
+forall (tt in Years, dd in Days, hh in Hours, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create (pumpStorage(tt,dd, hh, ii, ss, ww));
 end-do
 
-forall (tt in Years, hh in Hours, ii in HydroPlants, ss in Scenarios, ww in Errors) do
-	create (pumpStorage(tt, hh, ii, ss, ww));
+forall (tt in Years, dd in Days, hh in Hours, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (unmetCap(tt,dd, hh, ii, ss, ww));
 end-do
 
-forall (tt in Years, hh in Hours, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (unmetCap(tt, hh, ii, ss, ww));
+forall (tt in Years, dd in Days, hh in Hours, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create(stored(tt,dd,hh,ii,ss,ww));
+	create(spilled(tt,dd,hh,ii,ss,ww));
 end-do
 
 !Constraints
 declarations
 	NetPresentValue:	linctr;!obj value
-	CapacityCon:		dynamic array (Years, CapPlants) of linctr;!available reliable capacity for sales in cap market
+	CapacityCon:		dynamic array (Years, CapPlants, Scenarios) of linctr;!available reliable capacity for sales in cap market
 	ProductionConWind:	dynamic array (Years, Hours, WindPlants, Scenarios, Errors) of linctr;!upper bound energy production form wind plants
 	ProductionConStable:dynamic array (Years, Hours, Plants, Scenarios, Errors) of linctr;!upper bound energy production. Except hydro?
 	ProductionThermal:	dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr;
 	StartingCon:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr;
 	RampingCon:			dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr;
 	HydroCon:			dynamic array (Years, Hours, HydroPlants, Scenarios, Errors, Hours0) of linctr;!hydropower constraint
-	InvestmentCon:		dynamic array (Plants) of linctr;
+	InvestmentCon:		dynamic array (Plants, Scenarios) of linctr;
 	ProdSalesBalance:	dynamic array (Years, Hours, Scenarios, Errors) of linctr;	!balancing production, sales, purchases, pumping
 	StressBalance:		dynamic array (Years, Hours, CapPlants, Scenarios, Errors) of linctr;!balancing production, sales and unmet cap liabilities during system stress
 	LowLimThermal:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr; ! lower limit production thermal plants
@@ -252,53 +263,25 @@ declarations
 end-declarations
 
 NetPresentValue :=
+	sum (ss in Scenarios)ProbS(ss)*(
 		-
-		sum (ii in Plants) (InvCost(ii)*investedCap(ii))! + InvCostFixed(ii)*chosenPlant(ii))
+		sum (ii in Plants) InvCost(ii)*investedCap(ii,ss)
 		-
-		sum (tt in Years,ii in Plants) DiscFactor(tt)*(DayAheadFee*dayAheadParticipation(tt) + IntraDayFee*intraDayParticipation(tt)+FixedOprCost(ii)*chosenPlant(ii))
+		!sum (tt in Years) DiscFactor(tt)*(DayAheadFee*dayAheadParticipation(tt) + BalanceFee*balanceParticipation(tt))
 		+
-		sum (tt in Years, ii in CapPlants) DiscFactor(tt)*CapPrice*soldCap(tt, ii)
+		sum (tt in Years, ii in CapPlants) DiscFactor(tt)*(CapPrice*soldCap(tt, ii,ss) - InvCostFixed(ii)*chosenPlant(ii,ss))
 		+ 
-		ScaleFactor * sum (tt in Years)DiscFactor(tt)*
-			(
-				sum (ss in Scenarios) Prob2(ss) *
-					(
-						sum (hh in Hours) (DayAheadPrice(hh)-TransCostDayAhead)*soldDayAhead(tt,hh,ss)
-						+
-						sum(hh in Hours, ww in Errors) Prob3(hh,ww)*
-							(
-								(
-									(
-										IDPriceFactor(hh)+ IDPriceConst*EstimatedProd(hh,ss)*(1-ForecastError(hh,ww))*TotalWindCap!IDPrice
-									)
-									-
-									TransCostIntraDay
-								)* soldIntraDay(tt,hh,ss,ww)
-								-
-								(
-								IDPriceFactor(hh)+ IDPriceConst*EstimatedProd(hh,ss)*(1-ForecastError(hh,ww))*TotalWindCap!IDPrice
-								+
-								TransCostIntraDay
-								)* purchIntraDay(tt,hh,ss,ww)
-							
-								+
-								sum (ii in Plants)
-									(
-										-
-										OprCost(ii)*production(tt,hh,ii,ss,ww)
-										-
-										Penalty*unmetCap(tt,hh,ii,ss,ww)
-									)	
-									-
-								sum( ii in ThermalPlants) StartUpCost(ii)*startedAt(tt,hh,ii,ss,ww)
-		
-							)
-					)
-			);
-			
-forall(tt in Years, ii in CapPlants) do
-	CapacityCon(tt,ii):=
-		soldCap(tt,ii) - investedCap(ii) <= 0;	!capacity sold from plant i in CM in year t cant be more than max capacity at cap plant i
+		sum (tt in Years, dd in Days, hh in Hours) DiscFactor*ScaleFactor*soldDayAhead(tt,dd,hh,ss)*(PriceDA-CostDA)
+		+
+		sum (tt in Years, dd in Days, hh in Hours, ww in Errors) ProbSE(dd,ss,ww)*(
+			soldID(tt,dd,hh,ss,ww)*(PriceID-CostID) - purchID(tt,dd,hh,ss,ww)*(PriceID+CostID) - sum (ii in Plants)ProdCost(ii)*production(tt,dd,hh,ii,ss,ww)
+			- sum (ii in ThermalPlants) StartUpCost(ii)*startedAt(tt,dd,hh,ii,ss,ww)
+			- sum (ii in CapPlants) Penalty*unmetCap(tt,dd,hh,ii,ss,ww))
+	);
+				
+forall(tt in Years, ii in CapPlants, ss in Scenarios) do
+	CapacityCon(tt,ii,ss):=
+		soldCap(tt,ii,ss) - investedCap(ii,ss) <= 0;	!capacity sold from plant i in CM in year t cant be more than max capacity at cap plant i
 end-do
 
 forall(tt in Years, hh in Hours, ii in WindPlants, ss in Scenarios, ww in Errors) do
@@ -346,9 +329,9 @@ forall(tt in Years, hh in Hours0, ii in HydroPlants, ss in Scenarios, ww in Erro
 		production(tt,hh,ii,ss,ww) <= ReservoirEnergy(ii,kk);
 end-do
 
-forall(ii in Plants) do
-	InvestmentCon(ii):=
-		investedCap(ii) - UpperCap(ii)*chosenPlant(ii) <= 0;
+forall(ii in Plants, ss in Scenarios) do
+	InvestmentCon(ii,ss):=
+		investedCap(ii,ss) - UpperCap(ii)*chosenPlant(ii,ss) <= 0;
 end-do
 
 forall(tt in Years, hh in Hours, ss in Scenarios, ww in Errors) do
