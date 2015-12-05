@@ -44,8 +44,8 @@ end-initializations
 	
 declarations
 	Years:			set of integer;	!Years in planning horizon
-	Days:			set of integer;	!Days where decitions are made (3)
-	DaysFC:			set of integer; !Days where a 24-forecast is given (4)
+	Days:			set of integer;	!Days where decitions are made (3) ?(2 3 4 )
+	DaysFC:			set of integer; !Days where a 24-forecast is given (4) ?(1 2 3 4)
 	Hours:			set of integer; !hours in each year in horizon
 	Hours0:			set of integer;	!all first hours in each period
 	HoursEnd		set of integer; !all final hours in each period
@@ -160,6 +160,8 @@ declarations
 	PumpEff:			real;!efficiency of pump storage
 	ScaleFactor:		integer;
 	TotalWindCap:		integer;	!total installed wind power capacity in market
+	ScenriosDay1		integer; !Number of scenarios day one (second stage)
+	Nodes				integer; !Total number of nodes in tree
 end-declarations
 	
 initializations from DataFile
@@ -174,6 +176,8 @@ initializations from DataFile
 	PumpEff;
 	ScaleFactor;
 	TotalWindCap;
+	ScenariosDay1;
+	Nodes;
 end-initializations
 
 !Variables
@@ -189,6 +193,7 @@ declarations
 	soldCapAnt:				dynamic array (Years, CapPlants) of mpvar;	
 
 	soldDayAhead: dynamic array(Years, Days, Hours, Scenarios) of mpvar;	!energy sold in day-ahead market for year t, hour h and 2nd stage scenario s
+	soldDayAheadAnt: dynamic array(Nodes, Years, Hours) of mpvar
 
 	production: dynamic array (Years, Days, Hours, Plants, Scenarios, Errors) of mpvar;	!energy produced from plant i
 	soldIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy sold in intra-day market
@@ -229,11 +234,15 @@ forall (tt in Years, ii in CapPlants) do
 end-do
 
 forall (tt in Years, dd in Days, hh in Hours, ss in Scenarios) do !consider preprocessing
-	create (soldDayAhead(tt,dd ,hh, ss));
+	create (soldDayAhead(tt, dd ,hh, ss));
+end-do
+
+forall (nn in Nodes, tt in Years, hh in Hours) do 
+	create (soldDayAheadAnt(nn, tt ,hh));
 end-do
 
 forall (tt in Years, dd in Days, hh in Hours, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (production(tt,dd, hh, ii, ss, ww));
+	create (production(tt, dd, hh, ii, ss, ww));
 end-do
 
 forall (tt in Years, dd in Days, hh in Hours, ss in Scenarios, ww in Errors) do !consider preprocessing
@@ -282,6 +291,7 @@ declarations
 	Anticipativity1:	dynamic array(Plants, Scenarios) of linctr;
 	Anticipativity2:	dynamic array(Plants, Scenarios) of linctr;
 	Anticipativity3:	dynamic array(Years, Plants, Scenarios) of linctr;
+	Anticipativity4:	dynamic array(Nodes, years, DaysFC, Hours, Scenarios) of linctr;
 end-declarations
 
 NetPresentValue :=
@@ -421,6 +431,24 @@ forall(tt in Years, ii in CapPlants, ss in Scenrios) do
 	Anticipativity3(tt,ii,ss):=
 	 	soldCap(tt,ii,ss) = soldCapAnt(tt,ii)
 end-do
+
+!Veldig usikker på dette fungerer.... Hvilke scenarioer restriksjonen gjelder for må være gitt av n. Det kan være lettere å hardcode det direkte når vi vet hvor mange scenarioer som er knyttet til hver node. 
+!antall noder in Nodes er noder som har day-ahead beslutninger 
+forall(nn =1, tt in Years, dd=1,  hh in Hours, ss in Scenarios) do
+	Anticipativity4(nn,tt,dd,hh,ss):=
+	 	soldDayAhead(tt,dd,hh,ss) = soldDayAheadAnt(nn,tt,hh)
+end-do
+
+forall(nn in Nodes |(nn>1 && nn <= (ScenariosDay1+1)), tt in Years, dd=2,  hh in Hours, ss in Scenarios | (Scenarios > (nn-1)*(nScearios/ScenariosDay1) && Scenarios <= (nn)*(nScearios/ScenariosDay1))) do
+	Anticipativity4(nn,tt,dd,hh,ss):=
+	 	soldDayAhead(tt,dd,hh,ss) = soldDayAheadAnt(nn,tt,hh)
+end-do
+
+forall(nn in Nodes |( nn > (ScenariosDay1+1) && nn <= (ScenariosDay1+ScenariosDay1^2)+1), tt in Years, dd=3,  hh in Hours, ss in Scenarios | (Scenarios > (nn-1)*((nScearios/ScenariosDay1)/ScenariosDay1) && Scenarios <= (nn)*((nScearios/ScenariosDay1)/ScenariosDay1))) do
+	Anticipativity4(nn,tt,dd,hh,ss):=
+	 	soldDayAhead(tt,dd,hh,ss) = soldDayAheadAnt(nn,tt,hh)
+end-do
+
 
 writeln("\nModel building completed in ", timestamp - timetracker, " seconds");
 writeln("\nSolving model...");
