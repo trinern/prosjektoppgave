@@ -186,7 +186,7 @@ declarations
 	soldIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy sold in intra-day market
 	purchIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy purchased in intra-day market
 	unmetCap: dynamic array (Years, Days, Hours, Plants, Scenarios, Errors) of mpvar;	!energy not meeting capacity liabilities. Assuming system stress lasting 1 h
-	pumpStorage:	dynamic array (Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
+	!pumpStorage:	dynamic array (Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
 	isRunning:		dynamic array(Years, Days, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
 	startedAt:		dynamic array(Years, Days, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
 	stored:			dynamic array(Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
@@ -247,16 +247,16 @@ end-do
 declarations
 	NetPresentValue:	linctr;!obj value
 	CapacityCon:		dynamic array (Years, CapPlants, Scenarios) of linctr;!available reliable capacity for sales in cap market
-	ProductionConWind:	dynamic array (Years, Hours, WindPlants, Scenarios, Errors) of linctr;!upper bound energy production form wind plants
-	ProductionConStable:dynamic array (Years, Hours, Plants, Scenarios, Errors) of linctr;!upper bound energy production. Except hydro?
-	ProductionThermal:	dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr;
-	StartingCon:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr;
-	RampingCon:			dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr;
-	HydroCon:			dynamic array (Years, Hours, HydroPlants, Scenarios, Errors, Hours0) of linctr;!hydropower constraint
+	ProductionConWind:	dynamic array (Years, Days, Hours, WindPlants, Scenarios, Errors) of linctr;!upper bound energy production form wind plants
+	ProductionConStable:dynamic array (Years, Days, Hours, Plants, Scenarios, Errors) of linctr;!upper bound energy production. Except hydro?
+	ProductionThermal:	dynamic array (Years, Days, Hours, ThermalPlants, Scenarios, Errors) of linctr;
+	StartingCon:		dynamic array (Years, Days, Hours, ThermalPlants, Scenarios, Errors) of linctr;
+	RampingCon:			dynamic array (Years, Days, Hours, ThermalPlants, Scenarios, Errors) of linctr;
+	HydroCon:			dynamic array (Years, Days, Hours, HydroPlants, Scenarios, Errors, Hours0) of linctr;!hydropower constraint
 	InvestmentCon:		dynamic array (Plants, Scenarios) of linctr;
-	ProdSalesBalance:	dynamic array (Years, Hours, Scenarios, Errors) of linctr;	!balancing production, sales, purchases, pumping
-	StressBalance:		dynamic array (Years, Hours, CapPlants, Scenarios, Errors) of linctr;!balancing production, sales and unmet cap liabilities during system stress
-	LowLimThermal:		dynamic array (Years, Hours, ThermalPlants, Scenarios, Errors) of linctr; ! lower limit production thermal plants
+	ProdSalesBalance:	dynamic array (Years, Days, Hours, Scenarios, Errors) of linctr;	!balancing production, sales, purchases, pumping
+	StressBalance:		dynamic array (Years, Days, Hours, CapPlants, Scenarios, Errors) of linctr;!balancing production, sales and unmet cap liabilities during system stress
+	LowLimThermal:		dynamic array (Years, Days, Hours, ThermalPlants, Scenarios, Errors) of linctr; ! lower limit production thermal plants
 	IDMarketPart1:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against purchase variable
 	IDMarketPart2:		dynamic array (Years) of linctr;	!controlling variable for balance market participation against sale variable
 	DayAheadMarketPart:	dynamic array (Years) of linctr;	!controlling variable for Day-ahead market participation
@@ -334,18 +334,18 @@ forall(ii in Plants, ss in Scenarios) do
 		investedCap(ii,ss) - UpperCap(ii)*chosenPlant(ii,ss) <= 0;
 end-do
 
-forall(tt in Years, hh in Hours, ss in Scenarios, ww in Errors) do
-	ProdSalesBalance(tt,hh,ss,ww):=												!Balance for energy produced, stored, sold and purchased
-		+ purchIntraDay(tt,hh,ss,ww)- soldIntraDay(tt,hh,ss,ww)
-		- soldDayAhead(tt,hh,ss)
-		- sum(ii in HydroPlants) pumpStorage(tt,hh,ii,ss,ww)
-		+ sum(ii in Plants)production(tt,hh,ii,ss,ww)
+forall(tt in Years, dd in Days, hh in Hours, ss in Scenarios, ww in Errors) do
+	ProdSalesBalance(tt,dd,hh,ss,ww):=												!Balance for energy produced, stored, sold and purchased
+		+ purchIntraDay(tt,dd,hh,ss,ww)- soldIntraDay(tt,dd,hh,ss,ww)
+		- soldDayAhead(tt,dd,hh,ss)
+		- sum(ii in HydroPlants) stored(tt,dd,hh,ii,ss,ww)
+		+ sum(ii in Plants)production(tt,dd,hh,ii,ss,ww)
 		= 0;	
 end-do		
 				
-forall (tt in Years, hh in Hours, ii in CapPlants, ss in Scenarios | (Demand(hh)-TotalWindCap*EstimatedProd(hh,ss)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
-	StressBalance(tt,hh,ii,ss,ww):=
-		production(tt,hh,ii,ss,ww) + unmetCap(tt,hh,ii,ss,ww) - soldCap(tt,ii) = 0; ! if sold cap from i must be met by production on plant i
+forall (tt in Years,dd in Days, hh in Hours, ii in CapPlants, ss in Scenarios | (Demand(hh)-TotalWindCap*EstimatedProd(hh,ss)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
+	StressBalance(tt,dd,hh,ii,ss,ww):=
+		production(tt,dd,hh,ii,ss,ww) + unmetCap(tt,dd,hh,ii,ss,ww) - soldCap(tt,dd,ii,ss) = 0; ! if sold cap from i must be met by production on plant i
 end-do
 
 (!
