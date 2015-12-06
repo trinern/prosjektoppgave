@@ -44,11 +44,14 @@ end-initializations
 	
 declarations
 	Years:			set of integer;	!Years in planning horizon
-	Days:			set of integer;	!Days where decitions are made (3) ?(2 3 4 )
-	DaysFC:			set of integer; !Days where a 24-forecast is given (4) ?(1 2 3 4)
+	Days:			set of integer;	!Days where decitions are made (1,2,3) ?(2 3 4 )
+	DaysFC:			set of integer; !Days where a 24-forecast is given (1,2,3,4) ?(1 2 3 4)
 	Hours:			set of integer; !hours in each year in horizon
 	Hours0:			set of integer;	!all first hours in each period
 	HoursEnd		set of integer; !all final hours in each period
+	HoursD1:		set of integer;
+	HoursD2:		set of integer;
+	HoursD3:		set of integer;
 	Plants:			set of integer;	!all identified power production plants
 	Scenarios:		set of integer;	!first level uncertainty, given as paths until leaf nodes
 	Errors:			set of integer;	!2nd level uncertainty
@@ -63,6 +66,9 @@ initializations from DataFile
 	DaysFC;
 	Hours0;
 	HoursEnd;
+	HoursD1;
+	HoursD2;
+	HoursD3;
 	CapPlants;
 	WindPlants;
 	ThermalPlants;
@@ -101,9 +107,9 @@ declarations
 	ProbSE:			array(Scenarios, Errors)	of real;	!probability for error w in hour h
 	IDPriceFactor:	array(Hours)				of	real;	!load specific intra-day price
 	!BalPurchPrice:	array(Scenarios, Errors)	of	real;!consider including demand
-	ForecastError:	array(Hours, Days, Scenarios, Errors)		of real;
+	ForecastError:	array(Hours, Scenarios, Errors)		of real;
 	DayAheadPrice:	array(Hours)				of real;
-	EstimatedProd:	array(Hours, DaysFC, Scenarios)		of real;!wind power production in scenario s, hour h
+	EstimatedProd:	array(Hours, Scenarios)		of real;!wind power production in scenario s, hour h
 	OprHours:		array(Plants)				of real;
 	ReservoirEnergy:array(HydroPlants, HoursEnd)		of integer;	!energy in reservoir at beginning of period (and end)
 	InFlow:			array(HydraPlants, Hours)	of real;
@@ -160,7 +166,7 @@ declarations
 	PumpEff:			real;!efficiency of pump storage
 	ScaleFactor:		integer;
 	TotalWindCap:		integer;	!total installed wind power capacity in market
-	ScenriosDay1		integer; !Number of scenarios day one (second stage)
+	ScenariosDay1		integer; !Number of scenarios day one (second stage)
 	Nodes				integer; !Total number of nodes in tree
 end-declarations
 	
@@ -199,7 +205,7 @@ declarations
 	soldIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy sold in intra-day market
 	purchIntraDay: dynamic array (Years, Days, Hours, Scenarios, Errors) of mpvar;	!energy purchased in intra-day market
 	unmetCap: dynamic array (Years, Days, Hours, Plants, Scenarios, Errors) of mpvar;	!energy not meeting capacity liabilities. Assuming system stress lasting 1 h
-	!pumpStorage:	dynamic array (Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
+	pumpStorage:	dynamic array (Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar;
 	isRunning:		dynamic array(Years, Days, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
 	startedAt:		dynamic array(Years, Days, Hours, ThermalPlants, Scenarios, Errors) of mpvar;
 	stored:			dynamic array(Years, Days, Hours, HydroPlants, Scenarios, Errors) of mpvar; !Energy stored in reservoir at end of hour h
@@ -215,7 +221,7 @@ end-do
 forall (ii in Plants) do
 	create (investedCapAnt(ii));
 	create (chosenPlantAnt(ii));
-	chosenPlant(ii) is_binary;
+	chosenPlantAnt(ii) is_binary;
 end-do
 
 (!forall (tt in Years) do
@@ -233,41 +239,95 @@ forall (tt in Years, ii in CapPlants) do
 	create (soldCapAnt(tt, ii));
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ss in Scenarios) do !consider preprocessing
-	create (soldDayAhead(tt, dd ,hh, ss));
+forall (tt in Years, hh in HoursD1, ss in Scenarios) do !consider preprocessing
+	create (soldDayAhead(tt, 1 ,hh, ss));
+end-do
+forall (tt in Years, hh in HoursD2, ss in Scenarios) do !consider preprocessing
+	create (soldDayAhead(tt, 2 ,hh, ss));
+end-do
+forall (tt in Years, hh in HoursD3, ss in Scenarios) do !consider preprocessing
+	create (soldDayAhead(tt,3 ,hh, ss));
 end-do
 
-forall (nn in Nodes, tt in Years, hh in Hours) do 
-	create (soldDayAheadAnt(nn, tt ,hh));
+!fiks korrespondanse dager, timer
+forall (tt in Years,nn in Nodes, hh in Hours) do 
+	create (soldDayAheadAnt( tt,nn,hh));
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (production(tt, dd, hh, ii, ss, ww));
+forall (tt in Years, hh in HoursD1, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (production(tt, 1, hh, ii, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD2, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (production(tt, 2, hh, ii, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD3, ii in Plants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (production(tt,3, hh, ii, ss, ww));
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (soldIntraDay(tt,dd, hh, ss, ww));
-	create (purchIntraDay(tt,dd, hh, ss, ww));
+forall (tt in Years, hh in HoursD1, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (soldIntraDay(tt,1, hh, ss, ww));
+	create (purchIntraDay(tt,1, hh, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD2, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (soldIntraDay(tt,2, hh, ss, ww));
+	create (purchIntraDay(tt,2, hh, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD3, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (soldIntraDay(tt,3, hh, ss, ww));
+	create (purchIntraDay(tt,3, hh, ss, ww));
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
-	create (startedAt(tt,dd, hh, ii, ss, ww));
-	startedAt(tt,dd,hh,ii,ss,ww) is_binary;
-	create (isRunning(tt,dd, hh, ii, ss, ww));
-	isRunning(tt,dd,hh,ii,ss,ww) is_binary;
+
+forall (tt in Years, hh in HoursD1, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
+	create (startedAt(tt,1, hh, ii, ss, ww));
+	startedAt(tt,1,hh,ii,ss,ww) is_binary;
+	create (isRunning(tt,1, hh, ii, ss, ww));
+	isRunning(tt,1,hh,ii,ss,ww) is_binary;
+end-do
+forall (tt in Years, hh in HoursD2, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
+	create (startedAt(tt,2, hh, ii, ss, ww));
+	startedAt(tt,2,hh,ii,ss,ww) is_binary;
+	create (isRunning(tt,2, hh, ii, ss, ww));
+	isRunning(tt,2,hh,ii,ss,ww) is_binary;
+end-do
+forall (tt in Years, hh in HoursD3, ii in ThermalPlants, ss in Scenarios, ww in Errors) do
+	create (startedAt(tt,3, hh, ii, ss, ww));
+	startedAt(tt,3,hh,ii,ss,ww) is_binary;
+	create (isRunning(tt,3, hh, ii, ss, ww));
+	isRunning(tt,3,hh,ii,ss,ww) is_binary;
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ii in HydroPlants, ss in Scenarios, ww in Errors) do
-	create (pumpStorage(tt,dd, hh, ii, ss, ww));
+forall (tt in Years, hh in HoursD1, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create (pumpStorage(tt,1,hh, ii, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD2, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create (pumpStorage(tt,2,hh, ii, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD3, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create (pumpStorage(tt,3,hh, ii, ss, ww));
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
-	create (unmetCap(tt,dd, hh, ii, ss, ww));
+forall (tt in Years, hh in HoursD1, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (unmetCap(tt,1, hh, ii, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD2, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (unmetCap(tt,2, hh, ii, ss, ww));
+end-do
+forall (tt in Years, hh in HoursD3, ii in CapPlants, ss in Scenarios, ww in Errors) do !consider preprocessing
+	create (unmetCap(tt,3, hh, ii, ss, ww));
 end-do
 
-forall (tt in Years, dd in Days, hh in Hours, ii in HydroPlants, ss in Scenarios, ww in Errors) do
-	create(stored(tt,dd,hh,ii,ss,ww));
-	create(spilled(tt,dd,hh,ii,ss,ww));
+forall (tt in Years, hh in HoursD1, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create(stored(tt,1,hh,ii,ss,ww));
+	create(spilled(tt,1,hh,ii,ss,ww));
+end-do
+forall (tt in Years, hh in HoursD2, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create(stored(tt,2,hh,ii,ss,ww));
+	create(spilled(tt,2,hh,ii,ss,ww));
+end-do
+forall (tt in Years, hh in HoursD3, ii in HydroPlants, ss in Scenarios, ww in Errors) do
+	create(stored(tt,3,hh,ii,ss,ww));
+	create(spilled(tt,3,hh,ii,ss,ww));
 end-do
 
 !Constraints
@@ -290,7 +350,7 @@ declarations
 	Anticipativity1:	dynamic array(Plants, Scenarios) of linctr;
 	Anticipativity2:	dynamic array(Plants, Scenarios) of linctr;
 	Anticipativity3:	dynamic array(Years, Plants, Scenarios) of linctr;
-	Anticipativity4:	dynamic array(Nodes, years, DaysFC, Hours, Scenarios) of linctr;
+	Anticipativity4:	dynamic array(Years, Nodes, DaysFC, Hours, Scenarios) of linctr;
 end-declarations
 
 NetPresentValue :=
@@ -300,14 +360,18 @@ NetPresentValue :=
 		-
 		!sum (tt in Years) DiscFactor(tt)*(DayAheadFee*dayAheadParticipation(tt) + BalanceFee*balanceParticipation(tt))
 		+
-		sum (tt in Years, ii in CapPlants) DiscFactor(tt)*(CapPrice*soldCap(tt, ii,ss) - InvCostFixed(ii)*chosenPlant(ii,ss))
+		sum (tt in Years, ii in CapPlants) DiscFactor(tt)*(CapPrice*soldCap(tt,ii,ss) - InvCostFixed(ii)*chosenPlant(ii,ss))
 		+ 
-		sum (tt in Years, dd in Days, hh in Hours) DiscFactor*ScaleFactor*soldDayAhead(tt,dd,hh,ss)*(PriceDA-CostDA)
+		sum (tt in Years, dd in Days, hh in Hours) DiscFactor*ScaleFactor*soldDayAhead(tt,dd,hh,ss)*(DayAheadPrice(hh)-TransCostDayAhead)
 		+
-		sum (tt in Years, dd in Days, hh in Hours, ww in Errors) ProbSE(dd,ss,ww)*(
-			soldID(tt,dd,hh,ss,ww)*(PriceID-CostID) - purchID(tt,dd,hh,ss,ww)*(PriceID+CostID) - sum (ii in Plants)ProdCost(ii)*production(tt,dd,hh,ii,ss,ww)
+		sum (tt in Years, dd in Days, hh in Hours, ww in Errors) ProbSE(dd,ss,ww)*
+		(
+			soldIntraDay(tt,dd,hh,ss,ww)*(IDPriceFactor(hh)*Demand(hh)+IDPriceConst-TransCostIntraDay) 
+			- purchIntraDay(tt,dd,hh,ss,ww)*(IDPriceFactor(hh)*Demand(hh)+IDPriceConst-TransCostIntraDay) 
+			- sum (ii in Plants)ProdCost(ii)*production(tt,dd,hh,ii,ss,ww)
 			- sum (ii in ThermalPlants) StartUpCost(ii)*startedAt(tt,dd,hh,ii,ss,ww)
-			- sum (ii in CapPlants) Penalty*unmetCap(tt,dd,hh,ii,ss,ww))
+			- sum (ii in CapPlants) Penalty*unmetCap(tt,dd,hh,ii,ss,ww)
+		)
 	);
 				
 forall(tt in Years, ii in CapPlants, ss in Scenarios) do
@@ -317,7 +381,7 @@ end-do
 
 forall(tt in Years, dd in Days, hh in Hours, ii in WindPlants, ss in Scenarios, ww in Errors) do
 	ProductionConWind(tt,dd,hh,ii,ss,ww):=
-		production(tt,dd, hh,ii,ss,ww) - (EstimatedProd(dd-1,hh,ss)+ ForecastError(dd,hh,ww))*OprHours(ii)*investedCap(ii,ss) = 0;	!Upper bound intermittent production, scenario dependent
+		production(tt,dd, hh,ii,ss,ww) - (EstimatedProd(hh,ss)+ ForecastError(hh,ss,ww))*OprHours(ii)*investedCap(ii,ss) = 0;	!Upper bound intermittent production, scenario dependent
 end-do
 
 forall(tt in Years, dd in Days, hh in Hours, ii in Plants | Plants <> WindPlants, ss in Scenarios, ww in Errors) do
@@ -357,7 +421,7 @@ end-do
 		
 forall(tt in Years, dd in Days, hh in Hours0, ii in HydroPlants, ss in Scenarios, ww in Errors) do
 	HydroCon(tt,dd,hh,ii,ss,ww):=
-		stored(tt,dd,hh,ii,ss,ww) - PumpEff*pumpStorage(tt,dd,hh,ii,ss,ww) + production(tt,dd,hh,ii,ss,ww) + spilled(tt,dd,hh,ii,ss,ww) = ReservoirEnergy(ii,hh) + InFlow(ii,hh);
+		stored(tt,dd,hh,ii,ss,ww) - PumpEff*pumpStorage(tt,dd,hh,ii,ss,ww) + production(tt,dd,hh,ii,ss,ww) + spilled(tt,dd,hh,ii,ss,ww) = ReservoirEnergy(ii,hh) + InFlow(ii,hh);!ResEnergy(ii,hh) or (ii)?
 end-do
 
 forall(tt in Years, dd in Days, hh in HoursEnd, ii in HydroPlants, ss in Scenarios, ww in Errors) do
@@ -381,7 +445,7 @@ end-do
 				
 forall (tt in Years,dd in Days, hh in Hours, ii in CapPlants, ss in Scenarios | (Demand(hh)-TotalWindCap*EstimatedProd(hh,ss)) > LowerStressLimit, ww in Errors) do !test for system stress, can use another value for wind power prod
 	StressBalance(tt,dd,hh,ii,ss,ww):=
-		production(tt,dd,hh,ii,ss,ww) + unmetCap(tt,dd,hh,ii,ss,ww) - soldCap(tt,dd,ii,ss) = 0; ! if sold cap from i must be met by production on plant i
+		production(tt,dd,hh,ii,ss,ww) + unmetCap(tt,dd,hh,ii,ss,ww) - soldCap(tt,ii,ss) = 0; ! if sold cap from i must be met by production on plant i
 end-do
 
 (!
@@ -418,34 +482,35 @@ end-do
 
 forall(ii in Plants, ss in Scenrios) do
 	Anticipativity1(ii,ss):=
-	 	investedCap(ii,ss) = investedCapAnt(ii)
+	 	investedCap(ii,ss) = investedCapAnt(ii);
 end-do
 
 forall(ii in Plants, ss in Scenrios) do
 	Anticipativity2(ii,ss):=
-	 	chosenPlant(ii,ss) = chosenPlntAnt(ii)
+	 	chosenPlant(ii,ss) = chosenPlantAnt(ii);
 end-do
 
-forall(tt in Years, ii in CapPlants, ss in Scenrios) do
+forall(tt in Years, ii in CapPlants, ss in Scenarios) do
 	Anticipativity3(tt,ii,ss):=
-	 	soldCap(tt,ii,ss) = soldCapAnt(tt,ii)
+	 	soldCap(tt,ii,ss) = soldCapAnt(tt,ii);
 end-do
 
+!!Kommet hit
 !Veldig usikker på dette fungerer.... Hvilke scenarioer restriksjonen gjelder for må være gitt av n. Det kan være lettere å hardcode det direkte når vi vet hvor mange scenarioer som er knyttet til hver node. 
 !antall noder in Nodes er noder som har day-ahead beslutninger 
-forall(nn =1, tt in Years, dd=1,  hh in Hours, ss in Scenarios) do
-	Anticipativity4(nn,tt,dd,hh,ss):=
-	 	soldDayAhead(tt,dd,hh,ss) = soldDayAheadAnt(nn,tt,hh)
+forall(tt in Years, hh in Hours, ss in Scenarios) do
+	Anticipativity4(tt,1,1,hh,ss):=
+	 	soldDayAhead(tt,1,hh,ss) = soldDayAheadAnt(tt,1,hh)
 end-do
 
-forall(nn in Nodes |(nn>1 && nn <= (ScenariosDay1+1)), tt in Years, dd=2,  hh in Hours, ss in Scenarios | (Scenarios > (nn-1)*(nScearios/ScenariosDay1) && Scenarios <= (nn)*(nScearios/ScenariosDay1))) do
-	Anticipativity4(nn,tt,dd,hh,ss):=
-	 	soldDayAhead(tt,dd,hh,ss) = soldDayAheadAnt(nn,tt,hh)
+forall(tt in Years,nn in Nodes |(nn>1 && nn <= (ScenariosDay1+1)),  hh in Hours, ss in Scenarios | (Scenarios > (nn-1)*(nScearios/ScenariosDay1) && Scenarios <= (nn)*(nScearios/ScenariosDay1))) do
+	Anticipativity4(tt,nn,2,hh,ss):=
+	 	soldDayAhead(tt,2,hh,ss) = soldDayAheadAnt(tt,nn,hh)
 end-do
 
-forall(nn in Nodes |( nn > (ScenariosDay1+1) && nn <= (ScenariosDay1+ScenariosDay1^2)+1), tt in Years, dd=3,  hh in Hours, ss in Scenarios | (Scenarios > (nn-1)*((nScearios/ScenariosDay1)/ScenariosDay1) && Scenarios <= (nn)*((nScearios/ScenariosDay1)/ScenariosDay1))) do
-	Anticipativity4(nn,tt,dd,hh,ss):=
-	 	soldDayAhead(tt,dd,hh,ss) = soldDayAheadAnt(nn,tt,hh)
+forall(tt in Years,nn in Nodes|(nn>(ScenariosDay1+1)&& nn<=(ScenariosDay1+ScenariosDay1^2)+1),hh in Hours,ss in Scenarios|(Scenarios >(nn-1)*((nScearios/ScenariosDay1)/ScenariosDay1) && Scenarios <= (nn)*((nScearios/ScenariosDay1)/ScenariosDay1))) do
+	Anticipativity4(nn,tt,3,hh,ss):=
+	 	soldDayAhead(tt,3,hh,ss) = soldDayAheadAnt(nn,tt,hh)
 end-do
 
 
