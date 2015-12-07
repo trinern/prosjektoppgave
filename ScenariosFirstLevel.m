@@ -2,8 +2,8 @@
 
 %user input
 Seasons=2;
-S1=4; %number of scenarios generated first stage in season
-MaxChange=3;
+S1=10; %number of scenarios generated first stage in season
+MaxChange=1;
 
 %Parameters
 filename='FirstLevScenarios.xlsx';
@@ -80,18 +80,18 @@ m=1;
 l=1;
 for i=1:Seasons    
     for k=1:S3
+        
         for j=1:ConHours 
             Tree(i,k,j)=scenarios1(i,m,j);
             Tree(i,k,j+ConHours)=scenarios2(i,l,j);
             Tree(i,k,j+2*ConHours)=scenarios3(i,k,j);
+        end
             if mod(k,S2)==0 && m<S1
                 m=m+1;
             end
             if mod(k,S1)==0 && l<S2
                 l=l+1;
             end
-        end
-
     end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -105,10 +105,13 @@ tempV=zeros(S3,1);
 
 for k=1:Seasons
     for h=1:2
+% k=1;
+% h=2;        
         t=h*24+1;
         for s=1:S3
            tempV(s)=(Tree(k,s,t)-Tree(k,s,t-1))/Tree(k,s,t-1);
         end
+        tempV
         Mean=mean(tempV);
         Std=std(tempV);
         Skew=sum((tempV-Mean).^3)./(S3-1)./Std.^3;
@@ -153,61 +156,61 @@ for i=1:Seasons
     end
 end
 
-
-
-% %Beregner momentene i hvert tre
-mom=zeros(4,Seasons*U,Hours3Days);
-%mom(1,,)=mean, mom(2,,,)=st.dev, mom(3,,)=Skewness, mom(4,,)=kurt
-tempV=zeros(S3,1);
-
-for k=1:Seasons
-    for h=1:Hours3Days
-        for s=1:S3
-           tempV(s,1)=Tree(k,s,h);
-        end
-       Mean=mean(tempV);
-       Std=std(tempV);
-       Skew=sum((tempV-Mean).^3)./S3./Std.^3;
-       Kurt= sum((tempV-Mean).^4)./S3./Std.^4;
-        mom(1,k,h)=Mean;
-        mom(2,k,h)=Std;
-        mom(3,k,h)=Skew;
-        mom(4,k,h)=Kurt;
-    end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Beregner momenter i historiske data
-histMom=zeros(4,Seasons*U,Hours3Days);
-tempHistV=zeros(Y,1);
-j=0;
-for h=Hours0
-    j=j+1;
-    for i=0:(Hours3Days-1)
-        for t=1:Y
-            tempHistV(t)=ProdData(h+i,t);
-        end
-        Mean=mean(tempHistV);
-        Std=std(tempHistV);
-        Skew=sum((tempHistV-Mean).^3)./S3./Std.^3;
-        Kurt= sum((tempHistV-Mean).^4)./S3./Std.^4;
-        histMom(1,j,i+1)=Mean;
-        histMom(2,j,i+1)=Std;
-        histMom(3,j,i+1)=Skew;
-        histMom(4,j,i+1)=Kurt;
-    end
-end
-
-%¨Beregner Deviation av momenter og sum av dev av momenter
-dev=zeros(4,Seasons*U,Hours3Days);
-sumDev=0;
-for i=1:4
-    for j=1:Seasons*U
-        for k=1:Hours3Days
-            dev(i,j,k)=abs((mom(i,j,k)-histMom(i,j,k))/(histMom(i,j,k)*288));
-            sumDev=sumDev+dev(i,j,k);
-        end
-    end
-end
-
-        
+% 
+% 
+% % %Beregner momentene i hvert tre
+% mom=zeros(4,Seasons*U,Hours3Days);
+% %mom(1,,)=mean, mom(2,,,)=st.dev, mom(3,,)=Skewness, mom(4,,)=kurt
+% tempV=zeros(S3,1);
+% 
+% for k=1:Seasons
+%     for h=1:Hours3Days
+%         for s=1:S3
+%            tempV(s,1)=Tree(k,s,h);
+%         end
+%        Mean=mean(tempV);
+%        Std=std(tempV);
+%        Skew=sum((tempV-Mean).^3)./S3./Std.^3;
+%        Kurt= sum((tempV-Mean).^4)./S3./Std.^4;
+%         mom(1,k,h)=Mean;
+%         mom(2,k,h)=Std;
+%         mom(3,k,h)=Skew;
+%         mom(4,k,h)=Kurt;
+%     end
+% end
+% 
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %Beregner momenter i historiske data
+% histMom=zeros(4,Seasons*U,Hours3Days);
+% tempHistV=zeros(Y,1);
+% j=0;
+% for h=Hours0
+%     j=j+1;
+%     for i=0:(Hours3Days-1)
+%         for t=1:Y
+%             tempHistV(t)=ProdData(h+i,t);
+%         end
+%         Mean=mean(tempHistV);
+%         Std=std(tempHistV);
+%         Skew=sum((tempHistV-Mean).^3)./S3./Std.^3;
+%         Kurt= sum((tempHistV-Mean).^4)./S3./Std.^4;
+%         histMom(1,j,i+1)=Mean;
+%         histMom(2,j,i+1)=Std;
+%         histMom(3,j,i+1)=Skew;
+%         histMom(4,j,i+1)=Kurt;
+%     end
+% end
+% 
+% %¨Beregner Deviation av momenter og sum av dev av momenter
+% dev=zeros(4,Seasons*U,Hours3Days);
+% sumDev=0;
+% for i=1:4
+%     for j=1:Seasons*U
+%         for k=1:Hours3Days
+%             dev(i,j,k)=abs((mom(i,j,k)-histMom(i,j,k))/(histMom(i,j,k)*288));
+%             sumDev=sumDev+dev(i,j,k);
+%         end
+%     end
+% end
+% 
+%         

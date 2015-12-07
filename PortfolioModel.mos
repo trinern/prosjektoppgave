@@ -1,6 +1,6 @@
 model PortfolioModel
 uses "mmxprs"; 
-
+ 
 options explterm, noimplicit;
 
 parameters
