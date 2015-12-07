@@ -4,7 +4,7 @@ nSeasons:	4
 nHours:		24
 nPlants: 	6
 nScenarios:	216
-nErrors:	2
+nErrors:	18
 
 Days:		[1 2 3]
 CapPlants:	[2 3]
@@ -14,14 +14,14 @@ HydroPlants:	[6]
 Seasons:	[1 2 3 4]
 
 DiscFactor:	[0.82 0.78 0.75 0.71 0.68 0.64 0.61 0.58 0.56 0.53]
-InvCost:	[718300 1789400 1520000 2840000 3625000]
-OprCost:	[49.2 22.1 0 0 0]
-FixedOprCost:	[15000 38000 13703 50243 97750]
-UpperCap:	[20000 30000 50000 50000 50000]
+InvCost:	[462528  1032259 1090392 2037312  2726017  855126]
+OprCost:	[49.2 22.1 0 0 0 0]
+FixedOprCost:	[15000 38000 13703 50243 97750 12000]
+UpperCap:	[20000 30000 50000 50000 50000 10000]
 StartUpCost:	[150 150]
 UpperRamping:	[0.7 1]
 LowerThermal:	[0.1 0.1]
-OprHours:	[0.912 0.902 0.979 0.959 0.946]
+OprHours:	[0.912 0.902 0.979 0.959 0.946 0.99]
 ReservoirEnergy:[30000]
 
 ScenariosDay1:		6
@@ -31,7 +31,7 @@ IDPriceConst:		-5.40
 TransCostDayAhead:	1.5
 TransCostIntraDay:	4.75
 PeriodsPerYear:		26
-LowerStressLimit:	0.5
+LowerStressLimit:	0.75
 PumpEff:		0.9
 ScaleFactor:		30
 TotalWindCap:		12440
