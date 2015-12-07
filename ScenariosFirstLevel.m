@@ -1,7 +1,7 @@
 %importer hours_years_vinddata.csv, matrise heter hoursyearsvinddata
 
 %user input
-Seasons=2;
+Seasons=4;
 S1=10; %number of scenarios generated first stage in season
 MaxChange=1;
 
@@ -13,6 +13,7 @@ ConHours=24;
 %Periods=365*24/Seasons/ConDays; %number of 3-day-periods in a year
 HoursInSeason=24*356/Seasons;
 Hours3Days=ConDays*ConHours;
+%HoursY=8760;
 
 
 S2=(S1^2); %number of scenarios generated second stage in season
@@ -26,7 +27,7 @@ TreeDim=ConDays*ConHours;
 scenarios1=zeros(Seasons,S1,ConHours);%first level second stage scenarios for season
 scenarios2=zeros(Seasons,S2,ConHours);%first level third stage scenarios for season
 scenarios3=zeros(Seasons,S3,ConHours);%first level fourth stage scenarios for season
-Hours0=zeros(1,Seasons);
+Hours0=zeros(ConDays,Seasons);
 Tree=zeros(Seasons,S3,TreeDim);
 
 for i=1:Seasons
@@ -36,8 +37,8 @@ end
 
 for k=1:Seasons
     H0=randi([MinHour(k),MaxHour(k)]);%first hour in scenario tree
-    Hours0(k)=H0;
-    for j=1:S1%every scenario is a 24-h time series from a random year
+    Hours0(1,k)=H0;
+    for j=1:S1%every scenario is a random 24-h time series within season from a random year
         y=randi(Y);
         for i=0:(ConHours-1)
             %fills the scenario with 24 h of values from the same year
@@ -45,7 +46,9 @@ for k=1:Seasons
             lastValue=scenarios1(k,j,(i+1));
         end
     end
-    H0=H0+24;
+    H0=randi([MinHour(k),MaxHour(k)]);
+    Hours0(2,k)=H0;
+    %H0=H0+24;
     for j=1:S2
         y=randi(Y);
         nextValue=ProdData(H0,y);
@@ -59,8 +62,9 @@ for k=1:Seasons
             lastValue=scenarios2(k,j,(i+1));
         end
     end
-    H0=H0+24;
-    for j=1:(S3)
+    H0=randi([MinHour(k),MaxHour(k)]);
+    Hours0(3,k)=H0;
+    for j=1:S3
         y=randi(Y);
         nextValue=ProdData(H0,y);
         while abs(lastValue-nextValue)/lastValue > MaxChange
@@ -76,9 +80,10 @@ end
     
 
 %Fills a matrix, Tree with all scenarios
-m=1;
-l=1;
+
 for i=1:Seasons    
+    m=1;
+    l=1;
     for k=1:S3
         
         for j=1:ConHours 
@@ -105,13 +110,10 @@ tempV=zeros(S3,1);
 
 for k=1:Seasons
     for h=1:2
-% k=1;
-% h=2;        
         t=h*24+1;
         for s=1:S3
            tempV(s)=(Tree(k,s,t)-Tree(k,s,t-1))/Tree(k,s,t-1);
         end
-        tempV
         Mean=mean(tempV);
         Std=std(tempV);
         Skew=sum((tempV-Mean).^3)./(S3-1)./Std.^3;
@@ -129,9 +131,10 @@ histMom=zeros(Seasons,2,4);
 tempHistV=zeros(Y,1);
 
 for i=1:Seasons
-    for j=1:2        
-        for t=1:Y
-            tempHistV(t)=(ProdData(H0+j*24,t)-ProdData(H0+j*24-1))/ProdData(H0+j*24-1);
+    for j=1:2 
+        t=Hours0(j+1,i);
+        for k=1:Y
+            tempHistV(k)=(ProdData(t,k)-ProdData(t-1,k))/ProdData(t-1,k);
         end
         Mean=mean(tempHistV);
         Std=std(tempHistV);
@@ -142,6 +145,7 @@ for i=1:Seasons
         histMom(i,j,3)=Skew;
         histMom(i,j,4)=Kurt;
     end
+    
 end
 
 %Beregner Deviation av momenter og sum av dev av momenter
@@ -156,61 +160,3 @@ for i=1:Seasons
     end
 end
 
-% 
-% 
-% % %Beregner momentene i hvert tre
-% mom=zeros(4,Seasons*U,Hours3Days);
-% %mom(1,,)=mean, mom(2,,,)=st.dev, mom(3,,)=Skewness, mom(4,,)=kurt
-% tempV=zeros(S3,1);
-% 
-% for k=1:Seasons
-%     for h=1:Hours3Days
-%         for s=1:S3
-%            tempV(s,1)=Tree(k,s,h);
-%         end
-%        Mean=mean(tempV);
-%        Std=std(tempV);
-%        Skew=sum((tempV-Mean).^3)./S3./Std.^3;
-%        Kurt= sum((tempV-Mean).^4)./S3./Std.^4;
-%         mom(1,k,h)=Mean;
-%         mom(2,k,h)=Std;
-%         mom(3,k,h)=Skew;
-%         mom(4,k,h)=Kurt;
-%     end
-% end
-% 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %Beregner momenter i historiske data
-% histMom=zeros(4,Seasons*U,Hours3Days);
-% tempHistV=zeros(Y,1);
-% j=0;
-% for h=Hours0
-%     j=j+1;
-%     for i=0:(Hours3Days-1)
-%         for t=1:Y
-%             tempHistV(t)=ProdData(h+i,t);
-%         end
-%         Mean=mean(tempHistV);
-%         Std=std(tempHistV);
-%         Skew=sum((tempHistV-Mean).^3)./S3./Std.^3;
-%         Kurt= sum((tempHistV-Mean).^4)./S3./Std.^4;
-%         histMom(1,j,i+1)=Mean;
-%         histMom(2,j,i+1)=Std;
-%         histMom(3,j,i+1)=Skew;
-%         histMom(4,j,i+1)=Kurt;
-%     end
-% end
-% 
-% %¨Beregner Deviation av momenter og sum av dev av momenter
-% dev=zeros(4,Seasons*U,Hours3Days);
-% sumDev=0;
-% for i=1:4
-%     for j=1:Seasons*U
-%         for k=1:Hours3Days
-%             dev(i,j,k)=abs((mom(i,j,k)-histMom(i,j,k))/(histMom(i,j,k)*288));
-%             sumDev=sumDev+dev(i,j,k);
-%         end
-%     end
-% end
-% 
-%         
