@@ -1,10 +1,14 @@
 nYears:		2
 nNodes:		15
 nHours:		96
+nHoursD1:	24
+nHoursD2:	48
+nHoursD3:	72
 nPlants: 	5
 nScenarios:	8
-nErrors:	5
+nErrors:	3
 
+Days:		[1 2]
 Hours0:		[1 49]
 HoursEnd:	[48 96]
 CapPlants:	[1 2]
