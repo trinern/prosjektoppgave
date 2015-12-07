@@ -1,5 +1,7 @@
 %importer hours_years_vinddata.csv, matrise heter hoursyearsvinddata
 
+fileID= fopen('ScenariosLevel1.txt','w');
+
 %user input
 Seasons=4;
 S1=10; %number of scenarios generated first stage in season
@@ -160,3 +162,4 @@ for i=1:Seasons
     end
 end
 
+fprintf(fileID,' %f',Tree);
