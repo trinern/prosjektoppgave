@@ -1,10 +1,12 @@
 nYears:		2
+nNodes:		15
 nHours:		96
 nPlants: 	5
-nScenarios:	2
+nScenarios:	8
 nErrors:	5
 
 Hours0:		[1 49]
+HoursEnd:	[48 96]
 CapPlants:	[1 2]
 WindPlants:	[3 4 5]
 ThermalPlants:	[1 2]
@@ -21,6 +23,7 @@ LowerThermal:	[0.1 0.1]
 OprHours:	[0.912 0.902 0.979 0.959 0.946]
 ReservoirEnergy:[]
 
+ScenariosDay1:		2
 CapPrice:		19.40
 Penalty:		200
 IDPriceConst:		-5.40
