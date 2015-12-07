@@ -512,12 +512,12 @@ forall(tt in Years, hh in Hours, ss in Scenarios) do
 	 	soldDayAhead(tt,1,hh,ss) = soldDayAheadAnt(tt,1,hh);
 end-do
 
-forall(tt in Years, nn in Nodes|(nn>1 & nn<=(ScenariosDay1+1)),  hh in Hours, ss in Scenarios | (Scenarios > (nn-2)*(nScearios/ScenariosDay1) && Scenarios <= (nn-1)*(nScearios/ScenariosDay1)))  do
+forall(tt in Years, nn in Nodes,hh in Hours, ss in Scenarios | nn>1 and nn <= (ScenariosDay1+1) and ss > (nn-2)*nScenarios/ScenariosDay1 and ss <= (nn-1)*nScenarios/ScenariosDay1) do
 	Anticipativity4(tt,nn,2,hh,ss):=
 	 	soldDayAhead(tt,2,hh,ss) = soldDayAheadAnt(tt,nn,hh);
 end-do
 
-forall(tt in Years,nn in Nodes|(nn>(ScenariosDay1+1)&& nn<=(ScenariosDay1+ScenariosDay1^2)+1),hh in Hours,ss in Scenarios|(Scenarios >(nn-ScenariosDay1-2)*((nScearios/ScenariosDay1)/ScenariosDay1) && Scenarios <= (nn-ScenariosDay1-1)*((nScearios/ScenariosDay1)/ScenariosDay1))) do
+forall(tt in Years,nn in Nodes,hh in Hours,ss in Scenarios |(nn>(ScenariosDay1+1) and nn<=((ScenariosDay1+ScenariosDay1^2)+1) and ss >(nn-ScenariosDay1-2)*nScenarios/ScenariosDay1^2 and ss <= (nn-ScenariosDay1-1)*nScenarios/ScenariosDay1^2)) do
 	Anticipativity4(nn,tt,3,hh,ss):=
 	 	soldDayAhead(tt,3,hh,ss) = soldDayAheadAnt(nn,tt,hh);
 end-do
