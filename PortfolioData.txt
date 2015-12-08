@@ -1,4 +1,3 @@
-nYears:		10
 nNodes:		13
 nSeasons:	4
 nHours:		24
@@ -7,13 +6,14 @@ nScenarios:	27
 nErrors:	8
 
 Days:		[1 2 3]
-CapPlants:	[2 3]
+CapPlants:	[1 2 6]
 WindPlants:	[3 4 5]
 ThermalPlants:	[1 2]
 HydroPlants:	[6]
 Seasons:	[1 2 3 4]
 
-DiscFactor:	[0.82 0.78 0.75 0.71 0.68 0.64 0.61 0.58 0.56 0.53]
+
+CapFactor:	[6.67]
 InvCost:	[462528  1032259 1090392 2037312  2726017  855126]
 OprCost:	[49.2 22.1 0 0 0 0]
 FixedOprCost:	[15000 38000 13703 50243 97750 12000]
@@ -30,7 +30,6 @@ Penalty:		200
 IDPriceConst:		-5.40
 TransCostDayAhead:	1.5
 TransCostIntraDay:	4.75
-PeriodsPerYear:		26
 LowerStressLimit:	0.75
 PumpEff:		0.9
 ScaleFactor:		30
