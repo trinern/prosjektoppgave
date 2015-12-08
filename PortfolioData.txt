@@ -1,10 +1,10 @@
 nYears:		10
-nNodes:		43
+nNodes:		13
 nSeasons:	4
 nHours:		24
 nPlants: 	6
-nScenarios:	216
-nErrors:	18
+nScenarios:	27
+nErrors:	8
 
 Days:		[1 2 3]
 CapPlants:	[2 3]
@@ -24,7 +24,7 @@ LowerThermal:	[0.1 0.1]
 OprHours:	[0.912 0.902 0.979 0.959 0.946 0.99]
 ReservoirEnergy:[30000]
 
-ScenariosDay1:		6
+ScenariosDay1:		3
 CapPrice:		19.40
 Penalty:		200
 IDPriceConst:		-5.40
