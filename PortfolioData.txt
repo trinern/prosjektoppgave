@@ -6,7 +6,7 @@ nScenarios:	27
 nErrors:	8
 
 Days:		[1 2 3]
-CapPlants:	[2 3]
+CapPlants:	[1 2 6]
 WindPlants:	[3 4 5]
 ThermalPlants:	[1 2]
 HydroPlants:	[6]
