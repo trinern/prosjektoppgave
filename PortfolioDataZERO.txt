@@ -12,11 +12,11 @@ ThermalPlants:	[1 2]
 HydroPlants:	[6 7]
 Seasons:	[1 2 3 4]
 
-InvCost:	[644761  0 100000 2840000  3800050  5470 2026470]
-OprCost:	[49.2 0 0 0 0 0 0]
-FixedOprCost:	[15000 0 2000 50243 97750 0 12000]
+InvCost:	[]
+OprCost:	[]
+FixedOprCost:	[]
 UpperCap:	[996 1920 120 240 480 10 15]
-StartUpCost:	[150 150]
+StartUpCost:	[]
 UpperRamping:	[0.7 1]
 LowerThermal:	[0.1 0.1]
 OprHours:	[0.912 0.902 0.979 0.959 0.946 0.99 0.99]
@@ -28,8 +28,8 @@ ScenariosDay1:		3
 CapPrice:		19.40
 Penalty:		200
 IDPriceConst:		-5.40
-TransCostDayAhead:	1.5
-TransCostIntraDay:	4.75
+TransCostDayAhead:	0
+TransCostIntraDay:	0
 LowerStressLimit:	0.88
 MaxDemand:		51300
 PumpEff:		0.9

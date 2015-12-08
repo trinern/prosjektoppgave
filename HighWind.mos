@@ -100,6 +100,7 @@ declarations
 	OprHours:		array(Plants)				of real;
 	ReservoirEnergy:array(HydroPlants)			of real;	!energy in reservoir at beginning of period (and end)
 	InFlow:			array(Seasons,HydroPlants)	of integer;
+	CFD:			array(WindPlants)			of integer;
 end-declarations
 
 declarations
@@ -116,6 +117,7 @@ initializations from DataFile
 	LowerThermal;
 	OprHours;
 	ReservoirEnergy;
+	CFD;
 end-initializations
 
 initializations from LoadFile
@@ -159,6 +161,7 @@ declarations
 	ScaleFactor:		integer;
 	TotalWindCap:		integer;	!total installed wind power capacity in market
 	ScenariosDay1:		integer; !Number of scenarios day one (second stage)
+	MaxDemand:			integer;
 end-declarations
 	
 initializations from DataFile
@@ -175,6 +178,7 @@ initializations from DataFile
 	ScaleFactor;
 	TotalWindCap;
 	ScenariosDay1;
+	MaxDemand;
 end-initializations
 
 !Variables
@@ -182,7 +186,7 @@ declarations
 	investedCap: 			dynamic array (Plants, Scenarios) of mpvar;	!cap invested in plant i
 	investedCapAnt:			dynamic array (Plants) of mpvar; !Non-anticipativity helping variable
 	chosenPlant: 			dynamic array (Plants, Scenarios) of mpvar;	!binary var = 1 if plant i is chosen for investment
-	chosenPlantAnt: 			dynamic array(Plants) of mpvar; !Non-anticipativity helping variable
+	chosenPlantAnt: 		dynamic array(Plants) of mpvar; !Non-anticipativity helping variable
 	soldCap: 				dynamic array (CapPlants, Scenarios) of mpvar;	!cap sold in cap market from plant i in year t
 	soldCapAnt:				dynamic array (CapPlants) of mpvar;	
 
@@ -290,8 +294,11 @@ NetPresentValue :=
 		sum (pp in Seasons, dd in Days, hh in Hours, ww in Errors) ProbE(ww)*
 		(
 			soldIntraDay(pp,dd,hh,ss,ww)*(IDPriceFactor(pp,dd,hh)+IDPriceConst*EstimatedProd(dd,hh,ss,pp)*(1+ForecastError(ww))-TransCostIntraDay) 
-			- purchIntraDay(pp,dd,hh,ss,ww)*(IDPriceFactor(pp,dd,hh)+IDPriceConst*EstimatedProd(dd,hh,ss,pp)*(1+ForecastError(ww))+TransCostIntraDay) 
-			- sum (ii in Plants)OprCost(ii)*production(pp,dd,hh,ii,ss,ww)
+			- purchIntraDay(pp,dd,hh,ss,ww)*(IDPriceFactor(pp,dd,hh)+IDPriceConst*EstimatedProd(dd,hh,ss,pp)*(1+ForecastError(ww))+TransCostIntraDay) !CFD
+			- sum (ii in Plants|ii not in WindPlants)OprCost(ii)*production(pp,dd,hh,ii,ss,ww)
+			- sum (ii in WindPlants|CFD(ii)>(IDPriceFactor(pp,dd,hh)+IDPriceConst*EstimatedProd(dd,hh,ss,pp)*(1+ForecastError(ww))))
+				production(pp,dd,hh,ii,ss,ww)*(OprCost(ii)-CFD(ii)+(IDPriceFactor(pp,dd,hh)+IDPriceConst*EstimatedProd(dd,hh,ss,pp)*(1+ForecastError(ww))))!CFD
+			- sum (ii in WindPlants|CFD(ii)<=(IDPriceFactor(pp,dd,hh)+IDPriceConst*EstimatedProd(dd,hh,ss,pp)*(1+ForecastError(ww))))production(pp,dd,hh,ii,ss,ww)*OprCost(ii)!CFD
 			- sum (ii in ThermalPlants) StartUpCost(ii)*startedAt(pp,dd,hh,ii,ss,ww)
 			- sum (ii in CapPlants) Penalty*unmetCap(pp,dd,hh,ii,ss,ww)
 		)
